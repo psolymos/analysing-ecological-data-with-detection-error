@@ -19,8 +19,8 @@ Free resources to brush up your knowledge:
 
 ## Setup instructions
 
-- [Install R](https://cran.r-project.org/)
-- [Install RStudio IDE](https://posit.co/download/rstudio-desktop/) (feel free to use your favorite IDE)
+- Install [R](https://cran.r-project.org/)
+- Install [RStudio Desktop](https://posit.co/download/rstudio-desktop), [Positron](https://posit.co/products/ide/positron), or use your favorite editor (IDE)
 
 Install required packages with the
 [`install.R`](./install.R) script:

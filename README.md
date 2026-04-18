@@ -23,8 +23,6 @@ The course emphasizes critical thinking and active learning through hands on pro
 
 The expected outcome of the course is a solid foundation for further professional development via increased confidence in applying these methods for field observations.
 
-
-
 During the course we will cover the following:
 
 - Understand basic statistical concepts related to detection error
@@ -44,9 +42,8 @@ for analysing point count data arising from avian field surveys
 
 - Venue: Delivered remotely
 - Time zone: UK (GMT)
-- Duration: 3 days
-- Contact hours: Approx. 12 hours
-- ECT’s: Equal to 3 ECT’s
+- Duration: 4 days
+- Contact hours: Approx. 16 hours
 - Language: English
 
 ## Course outline
@@ -55,7 +52,7 @@ for analysing point count data arising from avian field surveys
 - [Day 1: Introduction](./day-01/README.md)
 - [Day 2: Introduction to modeling](./day-02/README.md)
 - [Day 3: Different approaches I.](./day-03/README.md)
-- [Day 4: Different approaches Ii.](./day-04/README.md)
+- [Day 4: Different approaches II.](./day-04/README.md)
 
 ## Teaching Format
 
