@@ -27,6 +27,7 @@ suppressPackageStartupMessages({
     library(ggplot2)
     theme_set(theme_light())
     library(visreg)
+    library(pROC)
 })
 
 if (!interactive()) {
@@ -410,9 +411,6 @@ measure of the prediction accuracy is based on how often we predict
 the predictive ability. The area under the ROC curve is a measure of
 predictive ability of a classification model. We want this area to be
 close to 1.
-Are the results comparable to LM and Poisson regression? Notice that
-we lose substantial amount of information when we go from count data
-to binary data.
 
 ```{r}
 x$y01 <- ifelse(x$y > 0, 1, 0)
@@ -489,17 +487,37 @@ visreg::visreg(mB4, "pconif")
 visreg::visreg2d(mB4, "pconif", "ahm")
 ```
 
+Assess logistic regression model using ROC curve and AUC:
+
+```{r}
+table(y01 = x$y01, fit = ifelse(fitted(mB0) > 0.5, 1, 0))
+table(y01 = x$y01, fit = ifelse(fitted(mB4) > 0.5, 1, 0))
+
+pROC::auc(x$y01, fitted(mB0))
+pROC::auc(x$y01, fitted(mB1))
+pROC::auc(x$y01, fitted(mB4))
+
+plot(pROC::roc(x$y01, fitted(mB0)), col = 4)
+plot(pROC::roc(x$y01, fitted(mB1)), add = TRUE, col = 3)
+plot(pROC::roc(x$y01, fitted(mB4)), add = TRUE, col = 2)
+```
+
+Are the results comparable to LM and Poisson regression? Notice that
+we lose substantial amount of information when we go from count data
+to binary data.
+
 Notice the following:
-1. The logic behind LM and GLM is nearly identical. Our goal is to
+
+- The logic behind LM and GLM is nearly identical. Our goal is to
 reduce the prediction uncertainty using auxiliary information.
-2. The main point is that we have to use appropriate statistical model
+- The main point is that we have to use appropriate statistical model
 to quantify the intrinsic variability in the response variable.
-3. In both LM and GLM, we model the mean as a function of the
+- In both LM and GLM, we model the mean as a function of the
 covariates. This function has to conform to the natural limits
 imposed by the statistical model. The mean has to be positive for
 positive random variables; between 0 and 1 for a binary random
 variable etc.
-4. Concept of residuals is extremely tricky when the range of the
+- Concept of residuals is extremely tricky when the range of the
 statistical model is constrained.
 
 ## Count regression models
