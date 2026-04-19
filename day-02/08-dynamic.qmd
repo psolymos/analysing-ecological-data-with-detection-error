@@ -1,0 +1,33 @@
+---
+title: "Fitting N-mixture models"
+subtitle: "Point count data analysis workshop 2025"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+# options(width = 53, scipen = 999)
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+suppressPackageStartupMessages({
+    library(unmarked)
+    library(detect)
+    library(dplyr)
+    library(ggplot2)
+    theme_set(theme_light())
+})
+set.seed(1234)
+```
+
+https://github.com/psolymos/detect/blob/master/extras/revisitingSV/simuls6.R

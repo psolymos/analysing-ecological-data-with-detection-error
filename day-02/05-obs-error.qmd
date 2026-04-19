@@ -1,0 +1,140 @@
+---
+title: "Understanding observation error"
+subtitle: "Point count data analysis workshop 2025"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+# options(width = 53, scipen = 999)
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(ggplot2)
+})
+set.seed(1234)
+```
+
+# Observation error
+
+How good is our measurement?
+
+- Accuracy: how close is the measurement to the true value?
+- Precision: how close are repeated measurements to each other?
+
+When we talk about error in variables, we usually refer to accuracy. 
+Most often we assume that the error is so small that we can ignore it,
+or that the error is random and it'll just contribute to the overall variability.
+We can think of many sources of error in our data, e.g. due to spatial positioning,
+or variables being derived from satellite imagery (older vintage, cloud cover, etc.).
+
+When it comes to the response variable, we often have to deal with observation error. 
+This is the case when we are trying to measure something that is not directly observable, 
+e.g. occupancy status or abundance of a species. We can only get an estimate of the 
+true value, and this estimate is subject to observation error. 
+
+In the simplest case, say, we are interested in whether a site is occupied by a species or not. 
+We can only observe the species if it is present (true positive), 
+and we might fail to detect it even if it is present (false negative). 
+The other case is when the species is absent, but the observer mistakenly thinks it is present (false positive),
+e.g. due to misidentification. In most situations, we assume that there are no false positives, and we only deal with false negatives.
+
+- If the true occupancy status is 0 (absent), we will always observe 0
+- If the true occupancy status is 1 (present), we will observe 1 or 0, this is the detection error we need to account for in our models
+
+# Introduction to simulations
+
+The goal is to implement
+
+- a data generating mechanism
+- using random numbers
+
+Here is the most basic simulation: the coin flip.
+
+We assume that the coin is fair, therefore:
+
+- the probability of getting head ($y=1$) is $p=0.5$
+- the probability of getting tail ($y=0$) is $1-p=0.5$
+
+Here is code for setting the probability value $p$
+and getting the outcome $y$ using Uniform random numbers:
+
+1. We generate a random number (`u`) between 0 and 1
+2. The outcome is 1 if the number is $<p$
+3. The outcome is 0 if the random number of $\ge p$
+
+```{r}
+p <- 0.5
+
+u <- runif(n = 1, min = 0, max = 1)
+u
+
+y <- ifelse(u < p, 1, 0)
+y
+```
+
+::: {.callout-tip}
+## Reproducibility with random numbers
+
+Every time you run the code above, you'll get a different value for `u`
+and possibly a different outcome. To make this reproducible,
+we can set the random seed with e.g. `set.seed(123)`.
+:::
+
+The `runif()` function takes 3 arguments:
+
+- `n` is the number of trials, i.e. number of coin flips
+- `min` and `max` define the range, here we used the unit range $0-1$
+
+Here is the histogram of a $Uniform(0, 1)$ random variable:
+
+```{r}
+u <- runif(n = 100, min = 0, max = 1)
+summary(u)
+hist(u)
+```
+
+We use the random numbers to repeat the coin flip experiment 100 times
+and tabulate the results:
+
+```{r}
+ifelse(u < p, 1, 0) |>
+    table(y = _) |>
+    as.data.frame() |>
+    dplyr::mutate(Prop = Freq / sum(Freq))
+```
+
+We will see uses of the Uniform distribution later.
+
+Another way to run the coin flip experiment in R is to use the Bernoulli
+distribution.
+
+```{r}
+y <- rbinom(n = 100, size = 1, prob = p)
+summary(y)
+table(y = y) |>
+    as.data.frame() |>
+    dplyr::mutate(Prop = Freq / sum(Freq))
+```
+
+The `rbinom()` function takes 3 arguments:
+
+- `n` is the number of observations
+- `size` is the number of trials
+- `prob` is the probability of the outcome to be 1
+
+The `rbinom` name refers to the Binomial distribution, which is multiple
+independent Bernoulli trials. This is what the `size` argument refers to,
+i.e. `size = 1` means Bernoulli.

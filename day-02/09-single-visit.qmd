@@ -1,0 +1,194 @@
+---
+title: "Fitting N-mixture models"
+subtitle: "Point count data analysis workshop 2025"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+# options(width = 53, scipen = 999)
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+suppressPackageStartupMessages({
+    library(unmarked)
+    library(detect)
+    library(dplyr)
+    library(ggplot2)
+    theme_set(theme_light())
+})
+set.seed(1234)
+```
+
+# Field data analysis
+
+We will use the ABMI data, which has 3 equal (3.3 min) time intervals for each point count visit.
+We use the point level data, but only for the center point, so we can keep 
+sample size small and run the code quickly. When analyzing such data sets
+for real, we would use all the data and not subset it like this.
+
+```{r}
+if (!interactive()) {
+    d <- readRDS("../data/ab_birds_site_year_pt.rds")
+} else {
+    d <- readRDS("data/ab_birds_site_year_pt.rds")
+}
+
+spp <- "yellowrumped_warbler"
+
+x <- data.frame(
+    y1 = ifelse(d$visits$visit1[, spp] > 0, 1, 0),
+    y2 = ifelse(d$visits$visit2[, spp] > 0, 1, 0),
+    y3 = ifelse(d$visits$visit3[, spp] > 0, 1, 0),
+    n1 = d$visits$visit1[, spp],
+    n2 = d$visits$visit2[, spp],
+    n3 = d$visits$visit3[, spp],
+    d$vars
+)
+x$yday <- as.POSIXlt(x$fielddate)$yday / 365
+x$hr <- x$fieldtime / 24
+x$y_max <- pmax(x$y1, x$y2, x$y3)
+x$n_max <- pmax(x$n1, x$n2, x$n3)
+x <- x |>
+    filter(
+        hr > 0.1,
+        hr < 0.6,
+        yday > 0.37,
+        yday < 0.5
+    )
+x0 <- x[x$point == 1, ]
+```
+
+# Single visit occupancy
+
+```{r}
+m_sv <- svocc(
+    y1 ~ pconif + I(pconif^2) + thf | hr + I(hr^2) + yday,
+    data = x0,
+    link.sta = "logit"
+)
+summary(m_sv)
+
+fit_sv2 <- plogis(
+    model.matrix(formula(m_sv)$sta, x0) %*% coef(m_sv, model = "sta")
+)
+summary(fit_sv2)
+
+data.frame(x0, p_occ = fit_sv2) |>
+    ggplot(aes(x = pconif, y = p_occ, col = thf)) +
+    geom_point() +
+    ylim(0, 1)
+
+d2 <- plogis(
+    model.matrix(formula(m_sv)$det, x0) %*% coef(m_sv, model = "det")
+)
+summary(d2)
+
+data.frame(x0, p_det = d2) |>
+    ggplot(aes(x = hr, y = p_det, col = yday)) +
+    geom_point() +
+    ylim(0, 1)
+data.frame(x0, p_det = d2) |>
+    ggplot(aes(x = yday, y = p_det, col = hr)) +
+    geom_point() +
+    ylim(0, 1)
+
+# sometimes it is hard to get SEs, use bootstrap
+b <- bootstrap(m_sv, B = 250)
+summary(b, type = "boot")
+# explain parallelization options for bootstrap
+```
+
+Compare multiple and single visit results:
+
+```{r}
+umf2 <- unmarked::unmarkedFrameOccu(
+    y = x0[, c("y1", "y2", "y3")],
+    siteCovs = x0[, c("pconif", "thf")],
+    obsCovs = list(
+        hr = x0[, c("hr", "hr", "hr")],
+        yday = x0[, c("yday", "yday", "yday")]
+    )
+)
+m_mv2 <- unmarked::occu(
+    ~ hr + I(hr^2) + yday ~ pconif + I(pconif^2) + thf,
+    umf2
+)
+fit_mv2 <- plogis(model.matrix(m_mv2@formula[-2], x0) %*% coef(m_mv2, type = "state"))
+
+data.frame(p_occ = fit_mv2, p_max = fit_sv2) |>
+    ggplot(aes(x = fit_mv2, y = fit_sv2)) +
+    geom_point() +
+    geom_abline(lty = 2) +
+    geom_smooth(method = "lm", se = FALSE)
+mean(fit_mv2 / fit_sv2)
+```
+
+# Single visit N-mixture
+
+```{r}
+m_sv <- svabu(
+    n1 ~ pconif + I(pconif^2) + thf | hr + yday,
+    data = x0,
+    N.max = 100,
+    zeroinfl = FALSE
+)
+summary(m_sv)
+
+fit_mv <- exp(
+    model.matrix(formula(m_sv)$sta, x0) %*% coef(m_sv, model = "sta")
+)
+summary(fit_mv)
+data.frame(x0, lam = fit_mv) |>
+    ggplot(aes(x = pconif, y = lam, col = thf)) +
+    geom_point()
+
+d2 <- plogis(
+    model.matrix(formula(m_sv)$det, x0) %*% coef(m_sv, model = "det")
+)
+summary(d2)
+data.frame(x0, p_det = d2) |>
+    ggplot(aes(x = hr, y = p_det, col = yday)) +
+    geom_point()
+data.frame(x0, p_det = d2) |>
+    ggplot(aes(x = yday, y = p_det, col = hr)) +
+    geom_point()
+
+# try 2nd and 3rd visit, what if we stack visits and assume independence?
+
+# calculate abundance from p_occ (using cloglog)
+
+# show model selection
+# explain strategy (why saturated to simpler works for SV)
+# explain conditional likelihood for abundance and what it means for model selection (reduced param space)
+```
+
+# RSPF condition
+
+RSPF condition reduces to the following two conditions:
+
+1. not all covariates in the model are categorical, and 
+2. the ratio function is nonlinear and involves all components of the
+parameter vector
+
+Remember that if the nonlinearity on the log-scale is weak, one
+may need very large sample sizes to get reasonable estimates.
+
+Use the shiny app to explore issues when both the status and detection components
+of the model are constants:
+
+```{r}
+#| eval: false
+shiny::runApp("apps/mvisit")
+```
+

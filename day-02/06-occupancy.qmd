@@ -1,0 +1,566 @@
+---
+title: "Fitting occupancy models"
+subtitle: "Point count data analysis workshop 2025"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+# options(width = 53, scipen = 999)
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+suppressPackageStartupMessages({
+    library(unmarked)
+    library(detect)
+    library(dplyr)
+    library(ggplot2)
+    theme_set(theme_light())
+})
+set.seed(1234)
+```
+
+# Simulating occupancy data
+
+Let's see how we can use the Bernoulli distribution and the `rbinom`
+function to simulate occupancy data.
+
+Let us sample $n=50$ locations and observe the occupancy status of
+Ovenbirds at each of the locations:
+
+- The true occupancy status at the $i$th location is $W_{i}$.
+- The probability of occupancy is $P(W_{i}=1)=\phi$.
+
+The true occupancy probability $\phi$ is denoted with `phi.true`:
+
+```{r}
+n <- 50
+phi.true <- 0.4
+
+W <- rbinom(n = n, size = 1, prob = phi.true)
+
+table(W = W)
+```
+
+
+There are many reasons why we might not observe the true occupancy status $W$.
+When the data that we collect ($Y$) is not the true occupancy status $W$, 
+we say that there is detection error. It can manifest the following way:
+
+We can capture detection error also as a probability $p$ which
+is the probability of detecting the species when present ($W_i=1$).
+
+- If the species is absent ($W_i=0$), we will always observe 0, thus $Y_i=0$: $P(Y_i=0|W_{i}=0)=1$.
+- If $W_i=1$, we might observe 0 (missed all the birds) or 1:
+  - species detected when present, $P(Y_i=1|W_{i}=1)=p$
+  - species not detected when present, $P(Y_i=0|W_{i}=1)=1-p$
+
+Let's simulate what we observe, the `Y` vector.
+We use the `rbinom()` function with `n = n` as before,
+but the size argument is not a fixed 1, but the true status `W`.
+When `W` is 0, the function will always return 0,
+when `W` is 1, the function will reyrun 1 or 0 according the the
+detection probability $p$, denoted as `p.true`:
+
+```{r}
+p.true <- 0.6
+Y <- rbinom(n = n, size = W, prob = p.true)
+
+table(W = W, Y = Y)
+```
+
+The cross-tabulation show how many times we observed 1's vs 0's when the
+true status was 1.
+
+Using the observations as if those would represent the true status
+is called the _naive_ approach. The naive approach assume that there is
+no observation error:
+
+```{r}
+mean(Y)
+```
+
+But we see that the mean of `Y` is quite far from `phi.true`.
+
+Fitting a logistic regression (aka Binomial GLM) to the data yields the
+same result:
+
+```{r}
+m1 <- glm(Y ~ 1, family = binomial)
+coef(m1)
+plogis(coef(m1))
+```
+
+The coefficient for the intercept is the maximum likelihood estimate on the
+logit scale. To transform that to the $0-1$ probability scale, we can use
+the `plogis()` function that implements the inverse logistic transformation.
+
+The unobserved `W` variable is often called a _latent_ variable.
+It is latent in the sense that it cannot be directly observed.
+We need to find ways to:
+
+- use survey design to minimize the detection error, or
+- use statistical models to correct for detection error, or
+- the combination of the 2.
+
+# Simulating multiple visits
+
+A feature of multiple-visit methods is that we visit the same site $T$ times.
+Each visit ($t=1,\ldots,T$) gives us a different observation, $Y_{it}$.
+
+Key assumptions are the following:
+
+- the visits are independent of each other
+- the true status $W$ stays the same over the visits ($W_i=W_{it}$)
+
+We can generalize the simulation code to any number of `T` visits as:
+
+```{r}
+T <- 5
+Y <- matrix(NA, n, T)
+for (t in 1:T) {
+    Y[, t] <- rbinom(n = n, size = W, prob = p.true)
+}
+```
+
+A more concise way of writing the above code without a loop is:
+
+```{r}
+#| eval: false
+Y <- replicate(T, rbinom(n = n, size = W, prob = p.true))
+```
+
+If we inspect any row (site) from the `Y` matrix, we see a series of 1's and 0's
+for sites where the species is present. This is called the _detection history_.
+
+```{r}
+data.frame(
+    W = head(W[W > 0]),
+    Visit = head(Y[W > 0, ])
+)
+```
+
+The detection history is all 0's for sites where the species is absent:
+
+```{r}
+data.frame(
+    W = head(W[W == 0]),
+    Visit = head(Y[W == 0, ])
+)
+```
+
+We can compare the maximum of the observed values over the visits at each site:
+
+```{r}
+Y_max <- apply(Y, 1, max)
+table(W = W, Y_max = Y_max)
+```
+
+Fit the logistic regression model to `Y_max`:
+
+```{r}
+m2 <- glm(Y_max ~ 1, family = binomial)
+coef(m2)
+plogis(coef(m2))
+```
+
+::: {.callout-tip}
+## What happens when we increase the number of visits?
+
+Change the value of `T` and compare the `Y_max` to `W`. 
+What happens to our _naive_ estimator of using `Y_max`?
+:::
+
+The maximum over a large number of visits will approach the latent
+variable `W`:
+
+```{r}
+n2 <- 500
+W2 <- rbinom(n = n2, size = 1, prob = phi.true)
+Tvals <- 1:10
+
+data.frame(
+    T = Tvals,
+    Y_max = sapply(Tvals, \(T) {
+        mean(apply(
+            replicate(T, rbinom(n = n2, size = W, prob = p.true)),
+            1, max
+        ))
+    })
+) |> ggplot(aes(x = T, y = Y_max)) +
+    geom_hline(yintercept = phi.true, lty = 2, col = 2) +
+    geom_hline(yintercept = mean(W), lty = 2, col = 4) +
+    geom_line() +
+    ylim(0, 1) +
+    scale_x_continuous(breaks = Tvals) +
+    theme_light()
+```
+
+# Fitting occupancy models
+
+The unmarked package implements the multiple-visit occupancy model.
+
+::: {.callout-caution collapse="true"}
+## References
+
+MacKenzie et al., 2002.
+Estimating site occupancy rates when detection probabilities are less than one.
+Ecology, 83:2248--2255.
+[Fulltext](https://www.sfu.ca/~lmgonigl/materials-qm/papers/mackenzie-2002-2248.pdf),
+DOI 10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2
+:::
+
+- Organize the data and an unmarked occupancy data frame
+- Fit the model with the `occu`
+- the `~1 ~1` formula says that we do not have covariates, just the intercepts
+
+```{r}
+umf <- unmarked::unmarkedFrameOccu(y = Y)
+summary(umf)
+
+m3 <- unmarked::occu(~1 ~ 1, umf)
+m3
+```
+
+We use the `plogis()` function again to transform the estimates to the
+probability scale and compare with our `phi.true` and `p.true` values:
+
+```{r}
+plogis(coef(m3, type = "det"))
+plogis(coef(m3, type = "state"))
+```
+
+## Maximum likelihood estimator
+
+The `glm()` and `occu()` functions use maximum likelihood to find the
+parameter estimates for a given data set.
+In other words, we coefficients (maximum likelihood estimate, or MLE)
+maximize the likelihood function for the data set in question.
+The likelihood function can be relatively simple and easy to calculate,
+or it can be computationally challenging to compute (e.g. for hierarchical
+or mixed models).
+
+The likelihood function $L$ for the simple occupancy model with 
+parameters $p$ and $\phi$ for multiple visits data can be written as:
+
+$$L(p, \phi; y_{1,1}, \ldots, y_{n,T})  = \prod_{i=1}^{n} \left[ \phi \left( \binom{T}{y_{i \cdot}} p^{y_{i \cdot}} (1 - p)^{T - y_{i \cdot}} \right) + (1 - \phi) I(y_{i \cdot} = 0)\right]$$
+
+where $y_{i \cdot} = \sum^{t=1}_{T} y_{i,t}$ and 
+$I( y_{i \cdot} = 0 )$ is an indicator function that is equal to 1 if $y_{i \cdot} = 0$.
+
+Here is the R code to calculate the log likelihood for the occupancy model:
+
+```{r}
+L_fun_occu <- function(Y, p, phi) {
+    ydot <- rowSums(Y)
+    T <- ncol(Y)
+    L <- prod(
+        phi *
+            (choose(T, ydot) * p^ydot * (1 - p)^(T - ydot)) +
+            (1 - phi) * (ydot == 0)
+    )
+    L
+}
+```
+
+Next, we evaluate the likelihood function at different values of `p` and `phi`
+while keeping the data `Y` constant. We set up the grid for this using
+`expand.grid()`:
+
+```{r}
+g <- 100
+grid <- expand.grid(
+    p = seq(0, 1, length.out = g),
+    phi = seq(0, 1, length.out = g),
+    L = NA
+)
+
+for (i in 1:nrow(grid)) {
+    grid$L[i] <- L_fun_occu(
+        Y = Y,
+        p = grid$p[i],
+        phi = grid$phi[i]
+    )
+}
+```
+
+When we plot the likelihood surface, we see the maximum, the lines indicate
+the true probability values:
+
+```{r}
+image(
+    list(
+        x = unique(grid$p),
+        y = unique(grid$phi),
+        z = matrix(grid$L, g, g)
+    ),
+    xlab = "p",
+    ylab = expression(varphi)
+)
+abline(h = phi.true, v = p.true, col = 1, lwd = 1)
+
+grid |> ggplot(aes(x = p, y = phi, z = L)) +
+    geom_contour_filled(show.legend = FALSE) +
+    geom_hline(yintercept = phi.true) +
+    geom_vline(xintercept = p.true) +
+    xlab("p") +
+    ylab(expression(phi)) +
+    theme_light()
+
+grid[which.max(grid$L), ]
+```
+
+If the rgl package is installed, we can view the surface in 3D:
+
+```{r}
+if (interactive()) {
+    library(rgl)
+
+    L_mat <- matrix(grid$L, g, g)
+    dcpal_grbu <- colorRampPalette(c("#18bc9c", "#3498db"))
+    Col <- rev(dcpal_grbu(12))[cut(L_mat, breaks = 12)]
+
+    open3d()
+    persp3d(
+        x = unique(grid$p),
+        y = unique(grid$phi),
+        z = L_mat / max(L_mat),
+        col = Col,
+        theta = 50, phi = 25, expand = 0.75, ticktype = "detailed",
+        xlab = "p", ylab = expression(phi), zlab = "L"
+    )
+    quads3d(
+        x = rep(p.true, 4),
+        y = c(0, 0, 1, 1),
+        z = c(0, 1, 1, 0),
+        alpha = 0.5, col = 2
+    )
+    quads3d(
+        x = c(0, 0, 1, 1),
+        y = rep(phi.true, 4),
+        z = c(0, 1, 1, 0),
+        alpha = 0.5, col = 4
+    )
+}
+```
+
+::: {.callout-note}
+We will circle back to these plots later, feel free to explore it
+with different settings of $n$, $T$, $p$, and $\phi$.
+:::
+
+# Field data analysis
+
+We will use the ABMI data, which has 3 equal (3.3 min) time intervals for each point count visit.
+We use the point level data, but only for the center point, so we can keep 
+sample size small and run the code quickly. When analyzing such data sets
+for real, we would use all the data and not subset it like this.
+
+```{r}
+if (!interactive()) {
+    d <- readRDS("../data/ab_birds_site_year_pt.rds")
+} else {
+    d <- readRDS("data/ab_birds_site_year_pt.rds")
+}
+
+spp <- "yellowrumped_warbler"
+
+x <- data.frame(
+    y1 = ifelse(d$visits$visit1[, spp] > 0, 1, 0),
+    y2 = ifelse(d$visits$visit2[, spp] > 0, 1, 0),
+    y3 = ifelse(d$visits$visit3[, spp] > 0, 1, 0),
+    n1 = d$visits$visit1[, spp],
+    n2 = d$visits$visit2[, spp],
+    n3 = d$visits$visit3[, spp],
+    d$vars
+)
+x$yday <- as.POSIXlt(x$fielddate)$yday / 365
+x$hr <- x$fieldtime / 24
+x$y_max <- pmax(x$y1, x$y2, x$y3)
+x$n_max <- pmax(x$n1, x$n2, x$n3)
+x <- x |>
+    filter(
+        hr > 0.1,
+        hr < 0.6,
+        yday > 0.37,
+        yday < 0.5
+    )
+x0 <- x[x$point == 1, ]
+```
+
+Naive occupancy estimates for the 3 visits:
+
+```{r}
+m_v1 <- glm(y1 ~ 1, data = x0, family = binomial)
+coef(m_v1)
+plogis(coef(m_v1))
+mean(x0$y1)
+
+m_v2 <- glm(y2 ~ 1, data = x0, family = binomial)
+coef(m_v2)
+plogis(coef(m_v2))
+mean(x0$y2)
+
+m_v3 <- glm(y3 ~ 1, data = x0, family = binomial)
+coef(m_v3)
+plogis(coef(m_v3))
+mean(x0$y3)
+```
+
+Given that the 3 subsequent 'visits' are actually time intervals within the same point count,
+we can safely assume that the true occupancy status does not change between the visits
+(closed population assumption). Therefore, we can use the `y_max` variable to fit a naive occupancy model
+to approximate the true occupancy status:
+
+```{r}
+m_max <- glm(y_max ~ 1, data = x0, family = binomial)
+coef(m_max)
+plogis(coef(m_max))
+mean(x0$y_max)
+```
+
+_Question_: What do you think about the closed population assumption?
+What if visits are days, weeks, months, or years apart?
+
+Let's fit the occupancy model to the data using all 3 visits:
+
+```{r}
+umf <- unmarked::unmarkedFrameOccu(y = x0[, c("y1", "y2", "y3")])
+summary(umf)
+
+m_mv <- unmarked::occu(~1 ~ 1, umf)
+m_mv
+
+plogis(coef(m_mv, type = "det"))
+plogis(coef(m_mv, type = "state"))
+```
+
+Use covariates: for status and detection
+
+```{r}
+umf2 <- unmarked::unmarkedFrameOccu(
+    y = x0[, c("y1", "y2", "y3")],
+    siteCovs = x0[, c("pconif", "thf")],
+    obsCovs = list(
+        hr = x0[, c("hr", "hr", "hr")],
+        yday = x0[, c("yday", "yday", "yday")]
+    )
+)
+summary(umf2)
+
+m_mv2 <- unmarked::occu(
+    ~ hr + I(hr^2) + yday ~ pconif + I(pconif^2) + thf,
+    umf2
+)
+m_mv2
+
+m_mv@AIC
+m_mv2@AIC
+```
+
+Fitted values reflect expected values of the marginal distribution,
+i.e. combining the state and detection processes:
+
+```{r}
+summary(fitted(m_mv2))
+
+colMeans(umf2@y)
+```
+
+We can calculate the expected occupancy probability for each site by using the coefficients of the model matrix:
+
+
+
+```{r}
+f <- m_mv2@formula[-2]
+f
+X <- model.matrix(f, x0)
+head(X)
+
+coef(m_mv2, type = "state")
+X[1, ] * coef(m_mv2, type = "state")
+sum(X[1, ] * coef(m_mv2, type = "state"))
+head(X %*% coef(m_mv2, type = "state"), 1)
+```
+
+```{r}
+fit_mv2 <- plogis(X %*% coef(m_mv2, type = "state"))
+summary(fit_mv2)
+hist(fit_mv2)
+```
+
+Visualize the fitted occupancy probabilities with respect to the covariates:
+
+```{r}
+data.frame(x0, p_occ = fit_mv2) |>
+    ggplot(aes(x = pconif, y = p_occ, col = thf)) +
+    geom_point() +
+    ylim(0, 1)
+
+data.frame(x0, p_occ = fit_mv2) |>
+    ggplot(aes(x = as.factor(y_max), y = p_occ)) +
+    geom_boxplot() +
+    ylim(0, 1)
+
+m_max2 <- glm(y_max ~ pconif + I(pconif^2) + thf, data = x0, family = binomial)
+
+data.frame(p_occ = fit_mv2, p_max = fitted(m_max2)) |>
+    ggplot(aes(x = p_max, y = p_occ)) +
+    geom_point() +
+    geom_abline(lty = 2) +
+    geom_smooth(method = "lm", se = FALSE)
+
+mean(fit_mv2 / fitted(m_max2))
+```
+
+Predict detection probability given detection covariates:
+
+```{r}
+Z <- model.matrix(m_mv2@formula[-3], x0)
+head(Z)
+det_mv2 <- plogis(Z %*% coef(m_mv2, type = "det"))
+summary(det_mv2)
+hist(det_mv2)
+```
+
+```{r}
+data.frame(x0, p_det = det_mv2) |>
+    ggplot(aes(x = yday, y = p_det, col = hr)) +
+    geom_point() +
+    ylim(0, 1)
+```
+
+_Question_: How would we assess model fit? Can we use AUC/ROC?
+
+What do we get when only using 2 visits?
+
+```{r}
+umf_v2 <- unmarked::unmarkedFrameOccu(y = x0[, c("y1", "y2")])
+m_mv_v2 <- unmarked::occu(~1 ~ 1, umf_v2)
+m_mv_v2
+plogis(coef(m_mv_v2, type = "det"))
+plogis(coef(m_mv_v2, type = "state"))
+```
+
+How about only using 1 visit?
+
+```{r}
+umf_v1 <- unmarked::unmarkedFrameOccu(y = x0[, c("y1"), drop = FALSE])
+m_mv_v1 <- unmarked::occu(~1 ~ 1, umf_v1)
+m_mv_v1
+plogis(coef(m_mv_v1, type = "det"))
+plogis(coef(m_mv_v1, type = "state"))
+```
+
+Something is wrong here, right?
+Let put this aside for now, we will come back to this later.
