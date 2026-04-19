@@ -4,6 +4,9 @@
 # Rscript --vanilla make.R --session 01
 # Rscript --vanilla make.R --session 01 --format beamer
 
+if (!requireNamespace("rconfig", quietly = TRUE)) {
+  install.packages("rconfig")
+}
 CONFIG <- rconfig::rconfig()
 str(CONFIG)
 
