@@ -1,0 +1,478 @@
+---
+title: "Field data collection and data compilation"
+subtitle: "Analysing Ecological Data with Detection Error"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+suppressPackageStartupMessages({
+    library(ggplot2)
+    library(corrplot)
+    library(mefa4)
+    library(skimr)
+    library(dplyr)
+    library(ggplot2)
+    theme_set(theme_light())
+    library(GGally)
+    library(partykit)
+})
+```
+
+# ABMI data
+
+## Raw data
+
+We start by loading the raw data file and taking a first look at its contents.
+`read.csv()` imports the ABMI breeding birds table into `b`.
+`str(b)` then prints a compact structural overview — number of rows and columns, each variable's name and type, and a preview of the first few values — which is the fastest way to confirm that columns were parsed correctly on import.
+`skimr::skim(b)` follows with a richer per-column summary: missing value counts, completeness rates, and type-appropriate statistics such as min/max/mean for numerics and frequency counts for characters.
+
+```{r}
+if (!interactive()) {
+    b <- read.csv("../data/A_T26A_Breeding_Birds_AllYear_AB.csv")
+} else {
+    b <- read.csv("data/A_T26A_Breeding_Birds_AllYear_AB.csv")
+}
+
+str(b)
+
+skimr::skim(b)
+```
+
+A tidy workflow would involve the following steps:
+
+- set the survey metadata table (site, year, coordinates, etc.)
+- join the predictor variables (climate, land cover, human footprint) using dplyr's `left_join()` by site and year or using `match()` to align rows.
+- join the response variables (bird counts), 1 species at a time
+
+Alternatively, we can pivot the bird counts to a wide format, where each species is a column, and then join this data to the the predictors. Here is an example of how to do this with the `Xtab` function from the `mefa4` package, which creates a cross-tabulation of counts by site and species. The resulting object `y` will have sites as rows and species as columns, with the counts of each species at each site.
+
+```{r}
+y <- mefa4::Xtab(~ ABMI.Site + Common.Name, b)
+
+head(y)
+```
+
+The object `y` is a so-called sparse matrix, which is a memory-efficient way to store data with many zeros (as is common in ecological count data). Use `as.matrix()` to convert it to a regular matrix if needed, e.g. before joining to the data frame with the other site variables.
+
+## Cleaned data
+
+In the next chunk, we switch from the raw table to a cleaned, analysis-ready data set.
+
+First, we read the `ab_birds_site_year` object from disk. This object stores the bird counts
+and the site-level variables in a format that is easier to work with than the original CSV.
+It also contains the data in a way that is more suitable for modeling, with separate matrices for counts and predictors. The `d` object is a list that contains at least two components: `counts`, which is a matrix of bird counts for each species, and `vars`, which is a data frame of site-year predictors.
+
+Next, we choose one focal species by setting `spp` to `"yellowrumped_warbler"`.
+This lets us pull out a single response variable from the full community data set.
+
+Finally, we create a new data frame called `x`. The column `y` contains the counts for the
+selected species, and the remaining columns come from `d$vars`, which holds the explanatory
+variables for each site-year. This gives us one table with the response and predictors side by
+side, ready for plotting or modeling.
+
+```{r}
+if (!interactive()) {
+    d <- readRDS("../data/ab_birds_site_year.rds")
+} else {
+    d <- readRDS("data/ab_birds_site_year.rds")
+}
+
+spp <- "yellowrumped_warbler"
+
+x <- data.frame(y = d$counts[, spp], d$vars)
+
+x$yday <- as.POSIXlt(x$fielddate)$yday / 365
+x$hr <- x$fieldtime / 24
+```
+
+Variables:
+
+- Metadata:
+  - `site`, `year`, `site_year`: site, year, unique ID for site/year (879 sites, 7911 points, 2003--2014),
+  - `latitude`, `longitude`: public coordinates (decimal degrees)
+  - `nrname`, `nsrname`: natural regions/subregions
+- Bioclimatic variables
+  - `ahm`: annual heat-moisture index (scaled temp/precip),
+  - `pet`: potential evapotranspiration,
+  - `ffp`: frost free period
+  - `map`: mean annual precipitaton,
+  - `mat`: mean annual temperature,
+  - `mcmt`: mean cold month (January) temperature,
+  - `mwmt`: mean warm month (July) temperature.
+- Land cover: natural vegetation (150 m radius circular buffer at points, averaged at sites, given as proportion [0--1] of total 7.1 ha buffer area)
+  - `pforest`: proportion of forest (coniferous, mixedwood, deciduous, Treed fens and bogs, includes cutblocks),
+  - `pconif`: proportion of coniferous forest (upland and lowland, includes cutblocks),
+  - `pwet`: proportion of lowland (wet) areas (treed and non-treed),
+  - `poldfor`: proportion of mature and old-growth (>80 yrs) forest.
+- Land cover: human footprint (0-1 as well as natural vegetation)
+  - `cult`: cultivation,
+  - `urbind`: urban/industrial,
+  - `softlin`: 'soft' (vegetated) linear features (seismic lines, pipelines, power lines, road verges),
+  - `hardlin`: 'hard' (non-vegetated) linear features (road and rails),
+  - `cc`: forestry cutblocks,
+  - `alien`: 'alienating' disturbances (soil disturbed, non regenerating, `cult + urbind + hardlin`),
+  - `succ`: 'successional' disturbances (soil undisturbed, regenerating, `cc + softlin`),
+  - `thf`: total human footprint (`alien + succ`).
+
+## Data exploration
+
+Overview of the data frame:
+
+```{r}
+head(x) # try also tail(x)
+
+str(x)
+
+summary(x)
+
+skimr::skim(x)
+
+round(cor(x[, sapply(x, is.numeric)]), 2)
+
+corrplot::corrplot(cor(x[, sapply(x, is.numeric)]), "ellipse")
+
+heatmap(cor(x[, sapply(x, is.numeric)]),
+    symm = TRUE,
+    col = hcl.colors(100, "RdYlBu", rev = TRUE)
+)
+```
+
+Explore the response variable:
+
+```{r}
+table(x$y)
+
+plot(table(x$y))
+```
+
+Explore the predictor variables:
+
+```{r}
+hist(x$ahm)
+hist(x$pforest)
+```
+
+Bivariate relationships:
+
+```{r}
+# where to begin
+cor(x[, sapply(x, is.numeric)])[, "y"] |> sort()
+
+x |>
+    ggplot(aes(x = pforest, y = y)) +
+    geom_point(alpha = 0.4) +
+    geom_smooth(method = "loess", se = TRUE)
+
+x |>
+    ggplot(aes(x = pconif, y = y)) +
+    geom_point(alpha = 0.4) +
+    geom_smooth(method = "loess", se = TRUE)
+
+x |>
+    ggplot(aes(x = as.factor(round(wind)), y = y)) +
+    geom_boxplot()
+```
+
+Trivariate relationships:
+
+```{r}
+x |>
+    ggplot(aes(x = pforest, y = ahm, col = y)) +
+    geom_point()
+
+x |>
+    ggplot(aes(x = longitude, y = latitude)) +
+    geom_point(aes(color = y > 0)) +
+    coord_quickmap()
+
+x |>
+    ggplot(aes(x = yday, y = hr, col = y)) +
+    geom_point()
+# need to filter some extreme values for better visualization
+x <- x |>
+    dplyr::filter(
+        hr > 0.1,
+        hr < 0.6,
+        yday > 0.37,
+        yday < 0.5
+    )
+x |>
+    ggplot(aes(x = yday, y = hr, col = y)) +
+    geom_point()
+```
+
+Multivariate relationships:
+
+```{r}
+GGally::ggpairs(
+    x,
+    columns = c("y", "ahm", "pforest", "pconif", "thf", "wind", "yday", "hr"),
+    diag = list(continuous = GGally::wrap("barDiag"))
+)
+```
+
+# JOSM data
+
+## Covariates
+
+Variables that co-vary with the response variable.
+Also called as independent variables, predictors.
+
+Let's continue with the JOSM data set:
+
+```{r}
+x <- detect::josm$surveys |>
+    dplyr::select(
+        Longitude,
+        Latitude,
+        WindStart,
+        TSSR,
+        DAY,
+        Open,
+        Water,
+        Decid,
+        OpenWet,
+        Conif,
+        ConifWet,
+        Agr,
+        UrbInd,
+        SoftLin,
+        Roads
+    )
+```
+
+STOP AND EXPLAIN EACH VARIABLE!
+
+## Variable types
+
+What type of variables we have? You can use the `str()` function to
+reveal the structure of R objects:
+
+```{r}
+str(x)
+```
+
+We see that these variables are all continuous.
+
+However, `WindStart` has very few distinct values, so we could treat it
+as ordinal (ordered factor):
+
+```{r}
+table(x$WindStart)
+x$WindOrd <- as.ordered(x$WindStart)
+str(x$WindOrd)
+levels(x$WindOrd)
+```
+
+Sometimes variables are binary. In R these can be logical (`TRUE`/`FALSE`)
+or coded as 0/1. Often we make such variables by discretizing other
+continuous or ordinal variables. E.g. We can create a binary wind variable:
+
+```{r}
+x$Wind01 <- ifelse(x$WindStart > 0, 1, 0)
+table(x$WindStart, x$Wind01)
+```
+
+Some categorical variables depend on some kind of classification,
+for example we can cut a continuous variable into bins:
+
+```{r}
+x$DecidCut <- cut(x$Decid, seq(0, 1, 0.2), include.lowest = TRUE)
+table(x$DecidCut)
+boxplot(Decid ~ DecidCut, x)
+```
+
+We can also inspect the land cover proportions that add up to 1 for each row.
+
+```{r}
+## define column names
+cn <- c(
+    "Open", "Water", "Agr", "UrbInd", "SoftLin", "Roads", "Decid",
+    "OpenWet", "Conif", "ConifWet"
+)
+## these sum to 1
+summary(rowSums(x[, cn]))
+```
+
+The `find_max()` function finds the maximum value in each row, the output 
+contains the value and the column where it was found, we can turn that into
+the dominant land cover type encoded in `HAB`:
+
+```{r}
+h <- mefa4::find_max(x[, cn])
+head(h)
+hist(h$value)
+table(h$index)
+x$HAB <- droplevels(h$index) # drop empty levels
+x$DEC <- ifelse(x$HAB == "Decid", 1, 0)
+```
+
+Other types of categorical variables are truly discrete, like observer,
+where there are no underlying continuous data:
+
+```{r}
+table(detect::josm$surveys$ObserverID)
+```
+
+When the number of categories increase and approach the sample size,
+we can consider treating these variables as random effects. E.g. the 
+`SurveyArea` variable that has 271 levels.
+
+## Data exploration
+
+We should inspect each variable that we want to use as a covariate.
+Here are some of the most important functions:
+
+```{r}
+summary(x$Decid) # check mean, range, missing values
+hist(x$Decid) # check skew and outliers
+```
+
+A nice way of getting all of the above nicely formatted is to use the skimr package:
+
+```{r}
+skimr::skim(x)
+```
+
+To explore relationships between variables, make scatter and box plots:
+
+```{r}
+x |> ggplot(aes(x = Decid, y = Conif)) +
+    geom_point()
+x |> ggplot(aes(x = Longitude, y = Latitude)) +
+    geom_point()
+x |> ggplot(aes(x = DAY, y = TSSR)) +
+    geom_point()
+x |> ggplot(aes(x = HAB, y = Decid)) +
+    geom_boxplot()
+```
+
+We can present 3 variables as color scatter or bubble plots:
+
+```{r}
+x |> ggplot(aes(x = Decid, y = ConifWet, col = HAB)) +
+    geom_point()
+```
+
+Multivariate exploration include checking correlations:
+
+```{r}
+round(cor(x[, cn]), 3)
+
+corrplot::corrplot(cor(x[, cn]), "ellipse")
+
+heatmap(as.matrix(x[, cn]))
+```
+
+## Variable transformations
+
+We have seen examples of these:
+
+- indicator variables (0/1)
+- discretization (cut)
+
+Other transformations include:
+
+- sqrt: to tame outliers (not suitable for negative values)
+- log: we'll see many use cases later
+- polynomials: nonlinear terms (`x^2`, `x^3`, etc.)
+- centering: keeps the distribution but shifts the mean
+- scaling: keeps the distribution but shifts the range (often used with centering)
+
+## Compound variables
+
+We can reduce correlation by combining variables together when those are additive:
+
+```{r}
+x$FOR <- x$Decid + x$Conif + x$ConifWet
+x$HF <- x$Agr + x$UrbInd + x$Roads + x$SoftLin
+x$WET <- x$OpenWet + x$ConifWet + x$Water
+```
+
+We can reduce colinearity by calculating variables relative to each other,
+like proportions or ratios (watch out for division by 0):
+
+```{r}
+x$pDecid <- ifelse(x$FOR > 0, x$Decid / x$FOR, 0)
+cor(x[, c("FOR", "pDecid")])
+```
+
+We can also merge categories, e.g. based on their similarity:
+
+```{r}
+heatmap(cor(x[, cn]))
+```
+
+## Missing data
+
+Let's check for missing values:
+
+```{r}
+data.frame(missing = colSums(is.na(x))) |> filter(missing > 0)
+```
+
+There are only 2 rows with missing values, we could use
+`na.omit(x)` to drop these, or we can impute the values:
+
+- pick a value randomly
+- use the mean
+- use the most common value (mode)
+- Use other variables to predict the possible value
+
+After inspecting the full data set, it turns out that site FT21204W
+experiences wind according to `WindEnd`:
+
+```{r}
+sites <- rownames(x)[is.na(x$WindStart)]
+detect::josm$surveys[detect::josm$surveys$SiteID %in% c("FT07424", "FT21204W"), ]
+```
+
+Let's set the value to 3 for site FT21204W, and the mode (0) for site FT07424:
+
+```{r}
+x[sites, "WindStart"] <- c(0, 3)
+x[sites, "WindOrd"] <- c("0", "3")
+x[sites, "Wind01"] <- c(0, 1)
+```
+
+Any more `NA`s left?
+
+```{r}
+any(is.na(x))
+```
+
+## Response variable
+
+We have manipulated the covariates and the species counts. Let's put them together
+in the same data frame.
+
+```{r}
+spp <- "OVEN" # change here if you want to use another species
+detect::josm$species[spp, ]
+
+y <- mefa4::Xtab(~ SiteID + SpeciesID, detect::josm$counts)[, spp, drop = FALSE]
+x$Count <- y[rownames(x), ]
+```
+
+Let's inspect the response variable:
+
+```{r}
+table(x$Count)
+```
+
+_Question_: How would we model the abundance of this species?
