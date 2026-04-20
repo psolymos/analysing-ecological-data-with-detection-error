@@ -23,6 +23,12 @@
       "source": "cran"
     },
     {
+      "package": "dismo",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
       "package": "Distance",
       "installed": false,
       "dev": false,
@@ -35,6 +41,12 @@
       "source": "cran"
     },
     {
+      "package": "gbm",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
       "package": "GGally",
       "installed": false,
       "dev": false,
@@ -42,6 +54,12 @@
     },
     {
       "package": "ggplot2",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "intrval",
       "installed": false,
       "dev": false,
       "source": "cran"
@@ -87,6 +105,12 @@
       "source": "cran"
     },
     {
+      "package": "opticut",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
       "package": "partykit",
       "installed": false,
       "dev": false,
@@ -124,6 +148,12 @@
     },
     {
       "package": "remotes",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "ResourceSelection",
       "installed": false,
       "dev": false,
       "source": "cran"
