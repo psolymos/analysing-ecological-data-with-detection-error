@@ -114,7 +114,7 @@ the intrinsic uncertainty characterized by $\sigma$
 3. Uncertainty in the prediction of an observation at a new location is a
 combination of the estimation uncertainty and the intrinsic
 uncertainty, the **prediction interval**
-1. There is another uncertainty, that of not knowing that the
+4. There is another uncertainty, that of not knowing that the
 true distribution is a Normal distribution, this is model uncertainty
 
 The estimation uncertainty can be reduced
@@ -148,17 +148,17 @@ algorithm. These may or may not be appropriate for every data set.
 We use this technique for screening the covariates.
 
 ```{r}
-ct <- x |>
+x_s <- x |>
     dplyr::select(
         -y,
         -site, -year, -site_year,
         -fielddate, -fieldtime,
         -nrname, -nsrname
-    ) |>
-    partykit::ctree(
-        log_y ~ .,
-        data = _
     )
+ct <- partykit::ctree(
+    log_y ~ .,
+    data = x_s
+)
 
 ct
 
@@ -227,6 +227,8 @@ MuMIn::model.sel(m0, m1, m2, m3, m4, m5, m6, m7)
 ```
 
 ## Interactions
+
+NOTE: plot the prediction surface to make sense of changed effects.
 
 ```{r}
 m8 <- lm(log_y ~ pconif * ahm, data = x)
