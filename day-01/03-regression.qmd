@@ -396,6 +396,8 @@ visreg::visreg(mP4, "pconif")
 visreg::visreg2d(mP4, "pconif", "ahm")
 ```
 
+Try `visreg()` with `scale = "linear"` and `scale = "response"`
+to see the difference between the linear predictor and the response scale.
 
 Now let us use the same data but now instead of observing the actual
 counts, suppose we only noted 0’s and 1’s where 1 indicates that the
