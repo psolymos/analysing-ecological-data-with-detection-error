@@ -2222,7 +2222,7 @@ vertical-align: -.125em;
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">Fitting N-mixture models</h1>
-<p class="subtitle lead">Point count data analysis workshop 2025</p>
+<p class="subtitle lead">Analysing Ecological Data with Detection Error</p>
 </div>
 
 
@@ -2562,13 +2562,56 @@ AIC =  1173 </code></pre>
 </figure>
 </div>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># try 2nd and 3rd visit, what if we stack visits and assume independence?</span></span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="co"># calculate abundance from p_occ (using cloglog)</span></span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="co"># show model selection</span></span>
-<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a><span class="co"># explain strategy (why saturated to simpler works for SV)</span></span>
-<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a><span class="co"># explain conditional likelihood for abundance and what it means for model selection (reduced param space)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p><em>Exercise</em>: Try using <code>svabu()</code> with the 2nd and 3rd visits.</p>
+<p>What if we stack visits and assume independence?</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>x1 <span class="ot">&lt;-</span> x0 <span class="sc">|&gt;</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(n1, n2, n3, pconif, thf, hr, yday) <span class="sc">|&gt;</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    tidyr<span class="sc">::</span><span class="fu">pivot_longer</span>(</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>        <span class="at">cols =</span> <span class="fu">starts_with</span>(<span class="st">&quot;n&quot;</span>),</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">names_to =</span> <span class="st">&quot;visit&quot;</span>,</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">values_to =</span> <span class="st">&quot;n&quot;</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>m_sv123 <span class="ot">&lt;-</span> <span class="fu">svabu</span>(</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    n <span class="sc">~</span> pconif <span class="sc">+</span> <span class="fu">I</span>(pconif<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> thf <span class="sc">|</span> hr <span class="sc">+</span> yday,</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> x1,</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">N.max =</span> <span class="dv">100</span>,</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">zeroinfl =</span> <span class="cn">FALSE</span></span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_sv123)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Model selection is more complicated for single visit models, because we need to make sure the model form satisfies the RSPF condition.</p>
+<p>The following strategy is recommended for single visit models:</p>
+<ol type="1">
+<li>Fit the most complex model (saturated) for both the status and detection components</li>
+<li>Then simplify the model by removing detection covariates one by one, starting with the least significant ones, and checking the AIC at each step</li>
+<li>Make sure that detection probability has sufficient variation (e.g. by plotting it against covariates), i.e. it is not close to constant, otherwise the model may not be identifiable and estimates may be unreliable</li>
+<li>Once you have a reasonable detection model, you can simplify the status component by removing covariates one by one, starting with the least significant ones, and checking the AIC at each step</li>
+</ol>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>m_sv_full <span class="ot">&lt;-</span> <span class="fu">svabu</span>(</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    n1 <span class="sc">~</span> pconif <span class="sc">+</span> <span class="fu">I</span>(pconif<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> thf <span class="sc">|</span> hr <span class="sc">+</span> <span class="fu">I</span>(hr<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> yday,</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> x0,</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">N.max =</span> <span class="dv">100</span>,</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">zeroinfl =</span> <span class="cn">FALSE</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_sv_full)</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a><span class="fu">drop1</span>(m_sv_full, <span class="at">model =</span> <span class="st">&quot;det&quot;</span>) <span class="co"># no huge drop in AIC</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>m_sv_red <span class="ot">&lt;-</span> <span class="fu">update</span>(m_sv_full, <span class="at">formula =</span> . <span class="sc">~</span> . <span class="sc">|</span> . <span class="sc">-</span> <span class="fu">I</span>(hr<span class="sc">^</span><span class="dv">2</span>))</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_sv_red)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a><span class="fu">drop1</span>(m_sv_red, <span class="at">model =</span> <span class="st">&quot;sta&quot;</span>) <span class="co"># no better model</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p><em>Exercise</em>: Try <code>zeroinfl = TRUE</code> and <code>distr = &quot;NB&quot;</code> to explore other model forms. Compare the models using AIC.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>m_sv_P <span class="ot">&lt;-</span> m_sv_red</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>m_sv_ZIP <span class="ot">&lt;-</span> <span class="fu">update</span>(m_sv_P, <span class="at">zeroinfl =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>m_sv_NB <span class="ot">&lt;-</span> <span class="fu">update</span>(m_sv_P, <span class="at">distr =</span> <span class="st">&quot;NB&quot;</span>)</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>m_sv_ZINB <span class="ot">&lt;-</span> <span class="fu">update</span>(m_sv_P, <span class="at">distr =</span> <span class="st">&quot;NB&quot;</span>, <span class="at">zeroinfl =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a><span class="fu">AIC</span>(m_sv_P, m_sv_NB, m_sv_ZIP, m_sv_ZINB)</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_sv_ZIP)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="rspf-condition" class="level1">
@@ -2581,7 +2624,7 @@ AIC =  1173 </code></pre>
 <p>Remember that if the nonlinearity on the log-scale is weak, one may need very large sample sizes to get reasonable estimates.</p>
 <p>Use the shiny app to explore issues when both the status and detection components of the model are constants:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">runApp</span>(<span class="st">&quot;apps/mvisit&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">runApp</span>(<span class="st">&quot;apps/mvisit&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 

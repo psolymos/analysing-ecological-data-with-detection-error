@@ -1,6 +1,6 @@
 ---
 title: "Fitting N-mixture models"
-subtitle: "Point count data analysis workshop 2025"
+subtitle: "Analysing Ecological Data with Detection Error"
 date: "`r Sys.Date()`"
 author: "Péter Sólymos"
 toc: true
@@ -30,4 +30,179 @@ suppressPackageStartupMessages({
 set.seed(1234)
 ```
 
-https://github.com/psolymos/detect/blob/master/extras/revisitingSV/simuls6.R
+Following simulation code from our MEE paper:
+<https://github.com/psolymos/detect/blob/master/extras/revisitingSV/simuls6.R>
+
+```{r}
+n <- 200 # number of sites
+x1 <- runif(n, 0, 1) # random predictors
+x2 <- rnorm(n, 0, 1)
+x3 <- runif(n, 0, 1)
+x4 <- rnorm(n, 0, 1)
+x <- data.frame(x1 = x1, x2 = x2, x3 = x3, x4 = x4)
+
+X <- model.matrix(~ x1 + x2, x)
+Z <- model.matrix(~ x3 + x4, x)
+
+K <- 100
+T <- 3
+
+## true coefficients
+beta <- c(2, -0.8, 0.6)
+theta <- c(-1, 2, -0.5)
+
+omega <- 0.999 # apparent survival probability in [0,1]
+
+p <- plogis(drop(Z %*% theta))
+lambda <- exp(drop(X %*% beta))
+```
+
+Dail & Madsen's `pcountOpen()` implements the following population dynamics models:
+
+- "constant" indicates that there is no relationship between omega and gamma. 
+- "autoreg" is an auto-regressive model in which recruitment is modeled as `gamma*N[i,t-1]`. 
+- "notrend" model gamma as `lambda*(1-omega)` such that there is no temporal trend. 
+- "trend" is a model for exponential growth, `N[i,t] = N[i,t-1]*gamma`, where gamma in this case is finite rate of increase (normally referred to as lambda). 
+- "ricker" is the Ricker-logistic model, `N[i,t] = N[i,t-1]*exp(gamma*(1-N[i,t-1]/omega))`, where gamma is the maximum instantaneous population growth rate (normally referred to as $r$) and omega is the equilibrium abundance (normally referred to as $K$). 
+- "gompertz" is a modified version of the Gompertz-logistic model, `N[i,t] = N[i,t-1]*exp(gamma*(1-log(N[i,t-1]+1)/log(omega+1)))`, where the interpretations of gamma and omega are similar to in the Ricker model.
+
+```{r}
+# when using dynamics 'constant', gamma is constant
+gamma <- 1 # recruitment rate
+
+N <- Y <- matrix(NA, n, T)
+S <- G <- matrix(NA, n, T - 1)
+N[, 1] <- rpois(n, lambda) # 1st visit abundance
+Y[, 1] <- rbinom(n, N[, 1], p) # 1st visit count
+for (i in 1:(T - 1)) {
+    S[, i] <- rbinom(n, N[, i], omega) # survival from t-1
+    G[, i] <- rpois(n, gamma) # recruitment
+    N[, i + 1] <- S[, i] + G[, i] # new N is survived + recruitment
+    Y[, i + 1] <- rbinom(n, N[, i + 1], p) # new Y as observed
+}
+```
+
+Estimate model parameters using `pcountOpen()`:
+
+```{r}
+## generalized N-mixture, T=3
+visitMat <- matrix(as.character(1:3), n, 3, byrow = TRUE)
+umfg <- unmarkedFramePCO(
+    y = Y[, 1:3],
+    siteCovs = x,
+    obsCovs = list(visit = visitMat),
+    numPrimary = 3
+)
+m0 <- pcountOpen(
+    lambdaformula = ~ x1 + x2,
+    gammaformula = ~1,
+    omegaformula = ~1,
+    pformula = ~ x3 + x4,
+    data = umfg,
+    K = K, mixture = "P",
+    dynamics = "constant"
+)
+m0
+
+cbind(
+    est = coef(m0),
+    true = c(beta, log(gamma), qlogis(omega), theta)
+)
+```
+
+Single visit N-mixture model: we fit model to each primary period separately, ignoring the population dynamics
+
+```{r}
+## single visit with n obs, T=1
+m1 <- svabu(Y[, 1] ~ x1 + x2 | x3 + x4, x,
+    zeroinfl = FALSE, link.det = "logit", N.max = K
+)
+m2 <- svabu(Y[, 2] ~ x1 + x2 | x3 + x4, x,
+    zeroinfl = FALSE, link.det = "logit", N.max = K
+)
+m3 <- svabu(Y[, 3] ~ x1 + x2 | x3 + x4, x,
+    zeroinfl = FALSE, link.det = "logit", N.max = K
+)
+```
+
+
+The assumption that transition parameters do not depend
+on covariates is not realistic. It implies that as time passes, the
+abundances are less affected by the covariates. However, when
+these parameters do depend on covariates, the estimation procedure is extremely slow.
+
+Populations are more open when omega is low, e.g. if survival is 0, all individuals come from recruitment (gamma).
+On the other hand, when omega is 1 and gamma is 0, there is no turnover and the population is closed.
+Omega dictates whether $N_{i} = N_{i,t}$ or not. Notice that the $N_{i} = N_{i,t}$
+is the closed population assumption of the original N-mixture model.
+
+When the population is open, visits become more independent, thus single visit
+approach is suitable without forcing any population model onto the data.
+
+We saw that detection probabilities varies over the visits.
+We can fit a single visit model to all 3 visits at the same time,
+thus providing more information for estimating the detection parameters, 
+but we need to include visit as a factor in the abundance model to allow for 
+variation in abundance across visits while keeping the detection estimates constant across visits.
+
+```{r}
+x123 <- rbind(
+    data.frame(y = Y[, 1], visit = factor(1, 1:3), x),
+    data.frame(y = Y[, 2], visit = factor(2, 1:3), x),
+    data.frame(y = Y[, 3], visit = factor(3, 1:3), x)
+)
+m123 <- svabu(y ~ x1 + x2 + visit | x3 + x4, x123,
+    zeroinfl = FALSE, link.det = "logit", N.max = K
+)
+```
+
+Comparing the results:
+
+```{r}
+beta0 <- coef(m0)[grepl("lam\\(", names(coef(m0)))]
+beta1 <- coef(m1, "sta")
+beta2 <- coef(m2, "sta")
+beta3 <- coef(m3, "sta")
+
+theta0 <- coef(m0)[grepl("p\\(", names(coef(m0)))]
+theta1 <- coef(m1, "det")
+theta2 <- coef(m2, "det")
+theta3 <- coef(m3, "det")
+
+beta123 <- coef(m123, "sta")
+theta123 <- coef(m123, "det")
+
+lamt1 <- mean(lambda)
+lamt2 <- mean(lamt1 * omega + gamma)
+lamt3 <- mean(lamt2 * omega + gamma)
+lam0 <- exp(drop(X %*% beta0))
+lam01 <- mean(lam0)
+lam02 <- mean(lam01 * plogis(coef(m0)["omega(Int)"])) +
+    exp(coef(m0)["gamConst(Int)"])
+lam03 <- mean(lam02 * plogis(coef(m0)["omega(Int)"])) +
+    exp(coef(m0)["gamConst(Int)"])
+lam1 <- mean(exp(drop(X %*% beta1)))
+lam2 <- mean(exp(drop(X %*% beta2)))
+lam3 <- mean(exp(drop(X %*% beta3)))
+lam1v <- mean(exp(drop(cbind(X, 0, 0) %*% beta123)))
+lam2v <- mean(exp(drop(cbind(X, 1, 0) %*% beta123)))
+lam3v <- mean(exp(drop(cbind(X, 0, 1) %*% beta123)))
+
+pt <- mean(p)
+p0 <- mean(plogis(drop(Z %*% theta0)))
+p1 <- mean(plogis(drop(Z %*% theta1)))
+p2 <- mean(plogis(drop(Z %*% theta2)))
+p3 <- mean(plogis(drop(Z %*% theta3)))
+p123 <- mean(plogis(drop(Z %*% theta123)))
+
+data.frame(
+    truth = c(lam1 = lamt1, lam2 = lamt2, lam3 = lamt3, p1 = pt, p2 = pt, p3 = pt),
+    DM = c(lam01, lam02, lam03, p0, p0, p0),
+    SV = c(lam1, lam2, lam3, p1, p2, p3),
+    SV123 = c(lam1v, lam2v, lam3v, p123, p123, p123)
+)
+```
+
+When the population is fully open across primary periods and there is not
+replication within primary periods, the generalized model has the same
+identifiability requirements as the single visit model, it needs to satisfy the same RSPF condition.

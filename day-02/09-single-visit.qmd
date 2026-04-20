@@ -1,6 +1,6 @@
 ---
 title: "Fitting N-mixture models"
-subtitle: "Point count data analysis workshop 2025"
+subtitle: "Analysing Ecological Data with Detection Error"
 date: "`r Sys.Date()`"
 author: "Péter Sólymos"
 toc: true
@@ -163,14 +163,69 @@ data.frame(x0, p_det = d2) |>
 data.frame(x0, p_det = d2) |>
     ggplot(aes(x = yday, y = p_det, col = hr)) +
     geom_point()
+```
 
-# try 2nd and 3rd visit, what if we stack visits and assume independence?
 
-# calculate abundance from p_occ (using cloglog)
+_Exercise_: Try using `svabu()` with the 2nd and 3rd visits.
 
-# show model selection
-# explain strategy (why saturated to simpler works for SV)
-# explain conditional likelihood for abundance and what it means for model selection (reduced param space)
+What if we stack visits and assume independence?
+
+```{r}
+#| eval: false
+x1 <- x0 |>
+    dplyr::select(n1, n2, n3, pconif, thf, hr, yday) |>
+    tidyr::pivot_longer(
+        cols = starts_with("n"),
+        names_to = "visit",
+        values_to = "n"
+    )
+m_sv123 <- svabu(
+    n ~ pconif + I(pconif^2) + thf | hr + yday,
+    data = x1,
+    N.max = 100,
+    zeroinfl = FALSE
+)
+summary(m_sv123)
+```
+
+Model selection is more complicated for single visit models, because we need to
+make sure the model form satisfies the RSPF condition.
+
+The following strategy is recommended for single visit models:
+
+1. Fit the most complex model (saturated) for both the status and detection components
+2. Then simplify the model by removing detection covariates one by one, starting with the least significant ones, and checking the AIC at each step
+3. Make sure that detection probability has sufficient variation (e.g. by plotting it against covariates), i.e. it is not close to constant, otherwise the model may not be identifiable and estimates may be unreliable
+4. Once you have a reasonable detection model, you can simplify the status component by removing covariates one by one, starting with the least significant ones, and checking the AIC at each step
+
+```{r}
+#| eval: false
+m_sv_full <- svabu(
+    n1 ~ pconif + I(pconif^2) + thf | hr + I(hr^2) + yday,
+    data = x0,
+    N.max = 100,
+    zeroinfl = FALSE
+)
+summary(m_sv_full)
+
+drop1(m_sv_full, model = "det") # no huge drop in AIC
+m_sv_red <- update(m_sv_full, formula = . ~ . | . - I(hr^2))
+summary(m_sv_red)
+drop1(m_sv_red, model = "sta") # no better model
+```
+
+_Exercise_: Try `zeroinfl = TRUE` and `distr = "NB"` to explore other model forms.
+Compare the models using AIC.
+
+```{r}
+#| eval: false
+m_sv_P <- m_sv_red
+m_sv_ZIP <- update(m_sv_P, zeroinfl = TRUE)
+m_sv_NB <- update(m_sv_P, distr = "NB")
+m_sv_ZINB <- update(m_sv_P, distr = "NB", zeroinfl = TRUE)
+
+AIC(m_sv_P, m_sv_NB, m_sv_ZIP, m_sv_ZINB)
+summary(m_sv_ZIP)
 ```
 
 # RSPF condition
