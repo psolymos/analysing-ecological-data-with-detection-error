@@ -1,0 +1,190 @@
+{
+  "version": "1.0",
+  "rver": "4.5.2",
+  "repos": [],
+  "sysreqs": [],
+  "packages": [
+    {
+      "package": "bSims",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "corrplot",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "detect",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "Distance",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "dplyr",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "GGally",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "ggplot2",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "knitr",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "lhreg",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "lme4",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "MASS",
+      "installed": true,
+      "dev": false
+    },
+    {
+      "package": "mefa4",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "mgcv",
+      "installed": true,
+      "dev": false
+    },
+    {
+      "package": "MuMIn",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "partykit",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "pROC",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "pscl",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "quarto",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "rconfig",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "reactable",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "remotes",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "rgl",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "rmarkdown",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "sf",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "shiny",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "skimr",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "survival",
+      "installed": true,
+      "dev": false
+    },
+    {
+      "package": "terra",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "unmarked",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "utils",
+      "installed": true,
+      "dev": false
+    },
+    {
+      "package": "visreg",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    }
+  ]
+}

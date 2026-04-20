@@ -2,7 +2,7 @@ dryrun <- FALSE
 ask <- TRUE
 
 cat(
-  "Helo!\n\n",
+  "Hello!\n\n",
   "This script will install required R packages for the\n",
   "'Analysing Ecological Data with Detection Error' workshop.\n\n"
 )
@@ -35,25 +35,31 @@ if (ask) {
       "detect",
       "Distance",
       "dplyr",
+      "GGally",
       "ggplot2",
-      "intrval",
       "knitr",
+      "lhreg",
       "lme4",
+      "MASS",
       "mefa4",
       "mgcv",
-      "mapview",
       "MuMIn",
-      "opticut",
       "partykit",
+      "pROC",
       "pscl",
       "quarto",
+      "rconfig",
+      "reactable",
       "remotes",
-      "ResourceSelection",
-      # "rgl",
+      "rgl",
+      "rmarkdown",
       "sf",
       "shiny",
+      "skimr",
+      "survival",
       "terra",
       "unmarked",
+      "utils",
       "visreg"
     )
     to_inst <- setdiff(pkgs, rownames(installed.packages()))
