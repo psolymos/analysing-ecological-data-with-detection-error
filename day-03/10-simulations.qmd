@@ -1,0 +1,259 @@
+---
+title: "Introduction to data simulations"
+subtitle: "Analysing Ecological Data with Detection Error"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+# options(width = 53, scipen = 999)
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+library(bSims) # startup message is actually interesting
+set.seed(1234)
+par(mar = c(1, 1, 1, 1))
+```
+
+When we looked at counts from the same site
+we have seen 2 types of counting strategies with respect to time:
+
+1. The same survey duration is repeated multiple times, and we count the total number of individuals detected in each visit. This is the case when we have multiple visits to the same site, and we want to estimate abundance via N-mixture models, etc. The counting process restarts from 0 at the beginning of each visit.
+2. We subdivide the total duration of a single visit into time intervals and we only count the new individuals only, e.g. the sum over the intervals is the total count for the visit.
+
+We have used the first for occupancy and N-mixture models. Let's see how the second approach can be implemented in a simulation framework.
+
+# Introduction
+
+The **bSims** R package is a _highly scientific_ and _utterly addictive_ bird point count simulator. Highly scientific, because it implements a spatially
+explicit mechanistic simulation that is based on statistical models
+widely used in bird point count analysis (i.e. removal models, distance 
+sampling), and utterly addictive because the implementation
+is designed to allow rapid interactive exploration (via **shiny** apps)
+and efficient simulation (supporting various parallel backends),
+thus elevating the user experience.
+
+Read more in the paper:
+
+Solymos, P. 2023. Agent-based simulations improve abundance estimation. _Biologia Futura_ 74, 377--392 [DOI 10.1007/s42977-023-00183-2](https://doi.org/10.1007/s42977-023-00183-2).
+
+The goals of the package are to: 
+
+1. allow easy _testing of statistical assumptions_ and explore 
+  effects of violating these assumptions,
+1. _aid survey design_ by comparing different options, 
+2. and most importantly, to _have fun_ while doing it via an 
+  intuitive and interactive user interface.
+
+The simulation interface was designed with the following principles in mind:
+
+1. _isolation_: the spatial scale is small (local point count scale) 
+  so that we can treat individual landscapes as more or less homogeneous 
+  units (but see below how certain stratified designs and edge effects 
+  can be incorporated) and independent in space and time;
+2. _realism_: the implementation of biological 
+  mechanisms and observation processes are realistic,
+  defaults are chosen to reflect common practice and assumptions;
+3. _efficiency_: implementation is computationally efficient
+  utilizing parallel computing backends when available;
+4. _extensibility_: the package functionality is 
+  well documented and easily extensible.
+
+This documents outlines the major functionality of the package.
+First we describe the motivation for the simulation and 
+the details of the layers. Then we outline an interactive workflow
+to design simulation studies and describe how to run
+efficient simulation experiments.
+Finally we present some of the current limitations of the
+framework and how to extend the existing functionality of the
+package to incorporate more of the biological realism into
+the simulations.
+
+# Design and implementation
+
+The simulation interface was designed with the following principles in mind:
+
+- Isolation: the spatial scale is small (local point count scale) so that we can treat individual landscapes as more or less homogeneous units (but see below how certain stratified designs and edge effects can be incorporated) and independent in space and time;
+- Realism: the implementation of biological mechanisms and observation processes are realistic, defaults are chosen to reflect common practice and assumptions;
+- Efficiency: implementation is computationally efficient utilizing parallel computing backends when available;
+- Extensibility: the package functionality is well documented and easily extensible.
+
+Going back to the Poisson–Binomial example, N would be a result of all the factors influencing bird abundance, such as geographic location, season, habitat suitability, number of conspecifics, competitors, or predators. Y, however, would largely depend on how the birds behave depending on the time of the day, or how the observer might detect or miss the different individuals, or count the same individual twice, etc.
+
+This series of conditional filtering of events lends itself to be represented as layers. These simulation layers are conditionally independent of each other. This design can facilitate the comparison of certain settings while keeping all the underlying layers of the realizations identical. This can help pinpointing the effects without the extra variability introduced by all the other underlying layers.
+
+The bSims package implements the following main 'verb' functions for simulating the conditionally independent layers:
+
+- Initialize (`bsims_init`): the landscape is defined by the extent and possible habitat stratification;
+- Populate (`bsims_populate`): the population of finite number of individuals within the extent of the landscape;
+- Animate (`bsims_animate`): individual behaviors described by movement and vocalization events, i.e. the frequency of sending various types of signals;
+- Detect (`bsims_detect`): the physical side of the observation process, i.e. transmitting and receiving the signal;
+- Transcribe (`bsims_transcribe`): the "human" aspect of the observation process, i.e. the perception of the received signal.
+
+# Limitations
+
+The package is not equipped with all the possible ways to estimate the
+model parameters. It only has rudimentary removal modeling and 
+distance sampling functionality implemented for the interactive
+visualization and testing purposes.
+Estimating parameters for more complex situations (i.e.
+finite mixture removal models, or via Hazard rate distance functions)
+or estimating abundance via multiple-visit N-mixture models etc. is
+outside of the scope of the package and it is the responsibility of the 
+user to make sure those work as expected.
+
+Other intentional limitation of the package is the lack of
+reverse interactions between the layers. For example
+the presence of an observer could influence behavior
+of the birds close to the observer. Such features can
+be implemented as methods extending the current functionality.
+
+Another limitation is that this implementation considers single
+species. Observers rarely collect data on single species 
+but rather count multiple species as part of the same survey.
+The commonness of the species, observer ability, etc. can influence
+the observation process when the whole community is considered.
+Such scenarios are also not considered at present. Although the same
+landscape can be reused for multiple species, and building up
+the simulation that way.
+
+The package considers simulations as independent 
+in space and time. When larger landscapes need to be simulated, 
+there might be several options: 
+(1) simulate a larger extent and put multiple independent observers 
+into the landscape; or (2) simulate independent landscapes in isolation.
+The latter approach can also address spatial and temporal
+heterogeneity in density, behaviour, etc. E.g. if
+singing rate is changing as a function of time of day,
+one can define the `vocal_rate` values as a function of time,
+and simulate independent animation layers.
+When the density varies in space, one can
+simulate independent population layers.
+
+# Simulations
+
+Introductory stats books begin with the coin flip to introduce
+the binomial distribution. In R we can easily simulate
+an outcome from such a random variable
+$Y \sim Binomial(1, p)$ doing something like this:
+
+```{r}
+#| eval: false
+p <- 0.5
+
+Y <- rbinom(1, size = 1, prob = p)
+```
+
+But a coin flip in reality is a lot more complicated: we might consider 
+the initial force, the height of the toss, the spin, 
+and the weight of the coin.
+
+Bird behavior combined with the observation process presents
+a more complicated system, that is often treated as a mixture of
+a count distribution and a detection/nondetection process, e.g.:
+
+```{r}
+#| eval: false
+D <- 2 # individuals / unit area
+A <- 1 # area
+p <- 0.8 # probability of availability given presence
+q <- 0.5 # probability of detection given availability
+
+N <- rpois(1, lambda = A * D)
+Y <- rbinom(1, size = N, prob = p * q)
+```
+
+This looks not too complicated, corresponding to the true abundance
+being a random variables $N \sim Poisson(DA)$, while the observed count
+being $Y \sim Binomial(N, pq)$.
+This is the exact simulation
+that we need when we want to make sure that an _estimator_
+can estimate the _model_ parameters (`lambda` and `prob` here).
+But such probabilistic simulations are not very useful when we are
+interested how well the _model_ captures important aspects of _reality_.
+
+Going back to the Poisson--Binomial example, `N` would be a result
+of all the factors influencing bird abundance, such as
+geographical location, season, habitat suitability, number of
+conspecifics, competitors, or predators. `Y` however would
+largely depend on how the birds behave depending on timing,
+or how an observer might detect or miss the different individuals,
+or count the same individual twice, etc.
+
+Therefore the package has layers, that by default are 
+_conditionally independent_ of each other. This design decision
+is meant to facilitate the comparison of certain settings
+while keeping all the underlying realizations identical, thus
+helping to pinpoint effects without the extra variability introduced
+by all the other effects.
+
+The conditionally independent _layers_ of a 
+**bSims** realization are the following, with the corresponding function:
+
+1. landscape (`bsims_init`),
+2. population (`bsims_populate`),
+3. behavior with movement and vocalization events (`bsims_animate`),
+4. the physical side of the observation process (`bsims_detect`), and
+5. the human aspect of the observation process (`bsims_transcribe`).
+
+See this example as a sneak peek that we'll explain 
+in the following subsections:
+
+```{r}
+phi <- 0.5 # singing rate
+tau <- 1:3 # detection distances by strata
+tbr <- c(3, 5, 10) # time intervals
+rbr <- c(0.5, 1, 1.5) # count radii
+
+l <- bsims_init(
+    extent = 10, # landscape
+    road = 0.25, edge = 0.5
+)
+p <- bsims_populate(l, # population
+    density = c(1, 1, 0)
+)
+e <- bsims_animate(p, # events
+    vocal_rate = phi,
+    move_rate = 1, movement = 0.2
+)
+d <- bsims_detect(e, # detections
+    tau = tau
+)
+x <- bsims_transcribe(d, # transcription
+    tint = tbr, rint = rbr
+)
+
+get_table(x) # removal table
+
+plot(l, main = "Initialize")
+plot(p, main = "Populate")
+plot(e, main = "Animate")
+plot(d, main = "Detect")
+plot(x, main = "Transcribe")
+```
+
+Read more:
+
+- Solymos, P. 2023. Agent-based simulations improve abundance estimation. _Biologia Futura_ 74, 377--392 [DOI 10.1007/s42977-023-00183-2](https://doi.org/10.1007/s42977-023-00183-2).
+- <https://peter.solymos.org/bSims/articles/bsims02-layers.html>
+- <https://peter.solymos.org/bSims/articles/bsims03-workflow.html>
+- Shinylive versions of the apps: <https://peter.solymos.org/bSims/articles/bsims04-apps.html>
+
+```{r}
+#| eval: false
+bSims::run_app("distfunH")
+bSims::run_app("distfunHER")
+
+bSims::run_app("bsimsH")
+bSims::run_app("bsimsHER")
+```
