@@ -36,7 +36,9 @@ if (!is.null(CONFIG$session)) {
   dir <- "."
   fl <- list.files(dir, recursive = TRUE)
   fl <- fl[grep("\\.qmd$", fl)]
-  fl <- fl[grep(SESSION, fl)]
+  if (SESSION != "0") {
+    fl <- fl[grep(SESSION, fl)]
+  }
 }
 
 OK <- logical(length(fl))
