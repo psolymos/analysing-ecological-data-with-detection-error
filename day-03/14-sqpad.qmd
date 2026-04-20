@@ -1,0 +1,135 @@
+---
+title: "Applications of variable-effort survey design"
+subtitle: "Analysing Ecological Data with Detection Error"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+<https://github.com/psolymos/sqpad-paper>
+
+<https://github.com/psolymos/sqpad-paper/blob/main/analysis/04-field-data.R>
+
+```{r}
+library(detect)
+
+set.seed(0)
+n <- 100
+x <- rnorm(n)
+D <- exp(-2 + 0.5 * x)
+phi <- 0.25
+tau <- 1
+dur <- sample(1:10, n, replace = TRUE)
+dis <- sample(seq(0.5, 2, 0.25), n, replace = TRUE)
+A <- dis^2 * pi
+dcorr <- 2 / 3
+p <- 1 - exp(-dur * phi * exp(-(dis * dcorr)^2 / tau^2))
+N <- rpois(n, D * A)
+Y <- rbinom(n, N, p)
+
+df <- data.frame(x = x, y = Y)
+
+m <- sqpad(y ~ x | 1, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
+
+print(m)
+summary(m)
+
+coef(m)
+nobs(m)
+vcov(m)
+confint(m)
+
+logLik(m)
+AIC(m)
+BIC(m)
+
+fitted(m)
+predict(m, type = "link")
+predict(m, newdata = df[1:10, ], type = "response")
+predict(m, newdata = df[1:10, ], type = "link")
+
+m0 <- sqpad(y ~ 1 | 1, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
+m1 <- sqpad(y ~ 1 | x, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
+m2 <- sqpad(y ~ x | x, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
+
+AIC(m, m0, m1, m2) # m2 is best
+BIC(m, m0, m1, m2) # this is needed!
+
+# average probability
+
+set.seed(5)
+n <- 1000
+x <- rnorm(n)
+D <- exp(-2 + 0.5 * x)
+phi <- 0.25
+tau <- 1
+dur <- sample(1:10, n, replace = TRUE)
+dis <- sample(seq(0.5, 2, 0.25), n, replace = TRUE)
+A <- dis^2 * pi
+
+dcorr <- 2 / 3
+p <- 1 - exp(-dur * phi * exp(-(dis * dcorr)^2 / tau^2))
+N <- rpois(n, D * A)
+Y <- rbinom(n, N, p)
+df <- data.frame(x = x, y = Y)
+
+np <- 1000
+dij <- rtriang(as.integer(np), 1)
+dij <- matrix(dij, nrow = n, ncol = np, byrow = TRUE)
+p2 <- rowMeans(1 - exp(-dur * phi * exp(-(dis * dij)^2 / tau^2)))
+Y2 <- rbinom(n, N, p2)
+df2 <- data.frame(x = x, y = Y2)
+
+plot(p, p2)
+abline(0, 1)
+
+mAP <- sqpad(y ~ x | 1,
+    data = df, dis = dis, dur = dur, type = "full",
+    det = "joint", K = NULL, montecarlo = FALSE, hessian = FALSE
+)
+mMC <- sqpad(y ~ x | 1,
+    data = df, dis = dis, dur = dur, type = "full",
+    det = "joint", K = NULL, montecarlo = TRUE, hessian = FALSE
+)
+m2AP <- sqpad(y ~ x | 1,
+    data = df2, dis = dis, dur = dur, type = "full",
+    det = "joint", K = NULL, montecarlo = FALSE, hessian = FALSE
+)
+m2MC <- sqpad(y ~ x | 1,
+    data = df2, dis = dis, dur = dur, type = "full",
+    det = "joint", K = NULL, montecarlo = TRUE, hessian = FALSE
+)
+
+cbind(mAP = coef(mAP), mMC = coef(mMC), m2AP = coef(m2AP), m2MC = coef(m2MC))
+
+# convolution likelihood
+
+D <- 1
+phi <- 0.25
+tau <- 1.2
+n <- 200
+
+dur <- sample(1:10, n, replace = TRUE)
+dis <- sample(seq(0.25, 2, 0.25), n, replace = TRUE)
+A <- dis^2 * pi
+N <- rpois(n, D * A)
+dislist <- lapply(seq_len(n), function(i) {
+    dij <- rtriang(N[i], dis[i])
+    # pij is based on time of 1st detection and distance at 1st detection
+    pij <- 1 - exp(-dur[i] * phi * exp(-(dij)^2 / tau^2))
+    Yij <- rbinom(length(pij), 1, pij)
+    dij[Yij > 0]
+})
+Y <- sapply(dis, length)
+
+m4 <- sqpad.fit(
+    Y = Y, dis = dis, dur = dur, dislist = dislist,
+    type = "conv", det = "joint", Nmax = 20
+)
+cbind(parameters = c(D = D, phi = phi, tau = tau), estimates = exp(m4$coef))
+```
