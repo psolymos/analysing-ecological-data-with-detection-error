@@ -245,6 +245,7 @@ plot(x, main = "Transcribe")
 Read more:
 
 - Solymos, P. 2023. Agent-based simulations improve abundance estimation. _Biologia Futura_ 74, 377--392 [DOI 10.1007/s42977-023-00183-2](https://doi.org/10.1007/s42977-023-00183-2).
+- <https://github.com/psolymos/bSims/blob/master/inst/bsims-paper/appendix.R>
 - <https://peter.solymos.org/bSims/articles/bsims02-layers.html>
 - <https://peter.solymos.org/bSims/articles/bsims03-workflow.html>
 - Shinylive versions of the apps: <https://peter.solymos.org/bSims/articles/bsims04-apps.html>
