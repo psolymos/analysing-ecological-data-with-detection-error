@@ -1,0 +1,302 @@
+---
+title: "Naïve estimates of occupancy and abundance"
+subtitle: "Analysing Ecological Data with Detection Error"
+date: "`r Sys.Date()`"
+author: "Péter Sólymos"
+toc: true
+format:
+  html: 
+    html-math-method: katex
+    self-contained: true
+  pdf: default
+---
+
+```{r}
+#| include: false
+library(knitr)
+```
+
+# Preamble
+
+```{r}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(mefa4)
+    library(detect)
+    library(ggplot2)
+    theme_set(theme_light())
+    library(visreg)
+})
+```
+
+Assemble the ABMI data:
+
+```{r}
+if (!interactive()) {
+    d <- readRDS("../data/ab_birds_site_year.rds")
+} else {
+    d <- readRDS("data/ab_birds_site_year.rds")
+}
+
+spp <- "yellowrumped_warbler"
+
+x <- data.frame(y = d$counts[, spp], d$vars)
+
+x$yday <- as.POSIXlt(x$fielddate)$yday / 365
+x$hr <- x$fieldtime / 24
+x <- x |>
+    dplyr::filter(
+        hr > 0.1,
+        hr < 0.6,
+        yday > 0.37,
+        yday < 0.5
+    )
+```
+
+# Nuisance variables
+
+Nuisance variables are covariates whose effects we want to control
+but we are not really interested in their effect. We just need to
+estimate them so that we can account for them as best as we can.
+
+We have 3 such covariates in our example:
+
+- `hr`: survey time, decimal 24 hr clock / 24
+- `yday`: day of the year, ordinal day / 365
+- `wind`: wind speed using [Beaufort scale](https://en.wikipedia.org/wiki/Beaufort_scale)
+
+```{r}
+m1 <- glm(
+    y ~
+        pconif + I(pconif^2) + ahm + thf +
+        hr + I(hr^2) + yday + wind,
+    data = x, family = poisson
+)
+summary(m1)
+
+visreg::visreg(m1, "hr", scale = "linear") # quadratic
+visreg::visreg(m1, "hr", scale = "response") # back-transformed to response scale
+visreg::visreg(m1, "yday", scale = "response")
+visreg::visreg(m1, "wind", scale = "response")
+```
+
+When predicting abundance and accounting for nuisance variables,
+we want to set the values that maximize the prediction.
+Two nuisance variables have a negative effect, so we need to pick the min:
+
+```{r}
+xnew <- x
+xnew$yday <- min(xnew$yday)
+xnew$wind <- min(xnew$wind)
+```
+
+The quadratic curve for `hr` means that we need to find the value of `hr`
+that maximizes the partial effect:
+
+```{r}
+hr <- seq(min(x$hr), max(x$hr), length.out = 100)
+f_hr <- coef(m1)["hr"] * hr + coef(m1)["I(hr^2)"] * hr^2
+plot(hr, f_hr, type = "l")
+abline(v = hr[which.max(f_hr)], lty = 2)
+xnew$hr <- hr[which.max(f_hr)]
+```
+
+`Pred` is the predicted abundance for the original data (same as `fitted(m1)`), 
+while `PredNew` is the predicted abundance for the new data with optimized 
+nuisance variables. The mean predicted abundance is higher when we optimize 
+the nuisance variables:
+
+```{r}
+x$Pred <- predict(m1, x, type = "response")
+x$PredNew <- predict(m1, xnew, type = "response")
+mean(x$Pred)
+mean(x$PredNew)
+
+x |> ggplot(aes(x = pconif, y = Pred, col = yday)) +
+    geom_point() +
+    theme_light()
+
+x |> ggplot(aes(x = pconif, y = PredNew)) +
+    geom_point() +
+    theme_light()
+
+x |> ggplot(aes(x = Pred, y = PredNew, col = yday)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1, lty = 2) +
+    theme_light()
+```
+
+## Offsets
+
+Offsets are constant terms in the linear predictor, e.g. 
+$log(\lambda_i) = \beta_0 + \beta_1 x_{1i} + o_i$, where $o_i$ is an offset.
+
+In the survey area case, an offset might be the log of area surveyed. 
+Abundance ($N$) is population density ($D$) multiplied by survey area ($A$). 
+The logic for this is based on point processes: intensity is a linear function 
+of area under a homogeneous Poisson point process. So we can say that 
+$E[Y_i] = N_i = D_i A_i$, thus $log(N_i) = log(D_i) + log(A_i)$ 
+where $o_i = log(A_i)$ is the offset.
+
+The problem is that we do not know the survey area. We used 10 minutes and
+unlimited distance counts.
+
+Let's see if using area as offset makes our models comparable. Instead of mixing up different survey types, let's see if we can make them identical. We use distance in meters divided by 100, so the population density is estimated in ha.
+
+## Distance effects
+
+We cannot use the unlimited distance counts to evaluate the effect of different
+point count radii on our estimates. See the JOSM data example for this.
+
+We will use the 150 m radius and assume that distance effects are negligible within this radius. 
+We will use the log of the area of a circle with 150 m radius as an offset:
+
+```{r}
+x$logA_150m <- log(pi * (150 / 100)^2)
+
+m2 <- update(m1, y ~ . + offset(logA_150m))
+summary(m2)
+```
+
+We use units of 100 m to get density estimates in ha. Notice that the
+intercept is now much lower. This is because the offset accounts for the area 
+surveyed, so the model is now estimating density (birds per ha) instead of 
+abundance (birds per point count):
+
+```{r}
+coef(m1)
+coef(m2)
+
+coef(m1)[1] - coef(m2)[1] # log of area ratio
+log(pi * (150 / 100)^2)
+```
+
+When the offset varies from site to site, the effects are more complex,
+but the principle is the same.
+
+## Duration effect
+
+Next we will inspect what effect the count duration has on our estimates.
+First we need to get the counts corresponding to the 3 time intervals:
+
+- 0--3.3 mins
+- 0--6.6 mins
+- 0--10 mins
+
+```{r}
+if (!interactive()) {
+    dp <- readRDS("../data/ab_birds_site_year_pt.rds")
+} else {
+    dp <- readRDS("data/ab_birds_site_year_pt.rds")
+}
+
+y123 <- mefa4::groupSums(
+    cbind(
+        y1 = dp$removal$int1[, spp],
+        y2 = dp$removal$int2[, spp],
+        y3 = dp$removal$int3[, spp]
+    ),
+    1,
+    dp$vars$site_year
+)
+x <- data.frame(y123[rownames(x), ], x)
+
+# cumulative counts
+x$y12 <- x$y1 + x$y2
+```
+
+The models for the 1st and the 1st + 2nd time intervals are:
+
+```{r}
+m3 <- update(m2, y1 ~ .)
+summary(m3)
+
+m4 <- update(m2, y12 ~ .)
+summary(m4)
+```
+
+Predictions using `xnew2`, setting the log area offset to 0 (unit area of 1 ha) to get density estimates:
+
+```{r}
+xnew2 <- xnew
+xnew2$logA_150m <- 0
+
+xnew2$Pred_3.3min <- predict(m3, xnew2, type = "response")
+xnew2$Pred_6.6min <- predict(m4, xnew2, type = "response")
+xnew2$Pred_10min <- predict(m2, xnew2, type = "response")
+```
+
+The 10 minutes estimates are higher due to accumulating more detections
+over the longer duration:
+
+```{r}
+D_est <- c(
+    "3.3min 150m" = mean(xnew2$Pred_3.3min),
+    "6.6min 150m" = mean(xnew2$Pred_6.6min),
+    "10min 150m"  = mean(xnew2$Pred_10min)
+)
+D_est
+
+barplot(D_est)
+```
+
+Make some plots to compare the site level predictions:
+
+```{r}
+xnew2 |> ggplot(aes(x = Pred_3.3min, y = Pred_6.6min)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1, lty = 2)
+
+xnew2 |> ggplot(aes(x = Pred_3.3min, y = Pred_10min)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1, lty = 2)
+
+xnew2 |> ggplot(aes(x = Pred_3.3min, y = Pred_10min)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1, lty = 2)
+```
+
+## Accounting for different field protocols
+
+When we survey some areas, the survey protocol is the same for all sites.
+However, when we combine different datasets, we might find that
+each might have a slightly different sampling design.
+
+Some surveys might be 10 min, other might be 0--3.3 min, etc.
+We will assign one of 3 survey protocols to each site, and set
+the `Count` values corresponding to the time and distance intervals.
+
+
+```{r}
+Methods <- c("3.3min", "6.6min", "10min")
+x$Method <- factor(sample(
+    Methods,
+    nrow(x),
+    replace = TRUE
+), levels = Methods)
+x$y_Rnd <- x$y1
+x$y_Rnd[x$Method == "6.6min"] <- x$y12[x$Method == "6.6min"]
+x$y_Rnd[x$Method == "10min"] <- x$y[x$Method == "10min"]
+```
+
+This next model will have `y_Rnd` as the response, and we add
+the `Method` variable and the offset `offset(logA_Rnd)`:
+
+```{r}
+m5 <- update(m2, y_Rnd ~ . + Method)
+summary(m5)
+```
+
+When predicting, we pick the method that leads to highest counts (10 min):
+
+```{r}
+xnew2$Method <- "10min" # highest duration, highest detection
+xnew2$Pred_Rnd <- predict(m5, xnew2, type = "response")
+
+mean(xnew2$Pred_Rnd)
+
+xnew2 |> ggplot(aes(x = pconif, y = Pred_Rnd)) +
+    geom_point() +
+    geom_smooth() +
+    ylab("Naive density [male individuals/ha]")
+```
