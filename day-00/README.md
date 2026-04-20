@@ -27,5 +27,6 @@ Install required packages with the
 
 ```R
 source(paste0("https://raw.githubusercontent.com/",
-    "psolymos/point-count-data-analysis/refs/heads/main/day-00/install.R"))
+  "psolymos/analysing-ecological-data-with-detection-error/",
+  "refs/heads/main/day-00/install.R"))
 ```
