@@ -18,12 +18,13 @@ fl <- list.files(".")
 fl <- fl[grep("\\.html$", fl)]
 fl <- fl[!grepl("index\\.html", fl)]
 
-for (f in fl) {
+for (i in seq_along(fl)) {
+    f <- fl[i]
     l <- suppressWarnings(readLines(f))
     l1 <- trimws(l[grep("<h1 class=\"title\">", l)])
     l1 <- gsub("<h1 class=\"title\">", "", l1)
     l1 <- gsub("</h1>", "", l1)
-    cat("- [", l1, "](./", f, ")\n", sep = "")
+    cat("- Session ", i, ": [", l1, "](./", f, ")\n", sep = "")
 }
 ```
 

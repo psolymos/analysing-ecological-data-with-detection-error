@@ -33,24 +33,41 @@ Assemble the ABMI data:
 
 ```{r}
 if (!interactive()) {
-    d <- readRDS("../data/ab_birds_site_year.rds")
+    d <- readRDS("../data/ab_birds_site_year_pt.rds")
 } else {
-    d <- readRDS("data/ab_birds_site_year.rds")
+    d <- readRDS("data/ab_birds_site_year_pt.rds")
 }
 
 spp <- "yellowrumped_warbler"
 
-x <- data.frame(y = d$counts[, spp], d$vars)
-
+x <- data.frame(
+    y = ifelse(d$counts[, spp] > 0, 1, 0),
+    y1 = ifelse(d$visits$visit1[, spp] > 0, 1, 0),
+    y2 = ifelse(d$visits$visit2[, spp] > 0, 1, 0),
+    y3 = ifelse(d$visits$visit3[, spp] > 0, 1, 0),
+    n = d$counts[, spp],
+    n1 = d$visits$visit1[, spp],
+    n2 = d$visits$visit2[, spp],
+    n3 = d$visits$visit3[, spp],
+    d$vars
+)
 x$yday <- as.POSIXlt(x$fielddate)$yday / 365
 x$hr <- x$fieldtime / 24
+x$y_max <- pmax(x$y1, x$y2, x$y3)
+x$n_max <- pmax(x$n1, x$n2, x$n3)
 x <- x |>
-    dplyr::filter(
+    filter(
         hr > 0.1,
         hr < 0.6,
         yday > 0.37,
         yday < 0.5
     )
+
+# cumulative counts
+x$y12 <- x$y1 + x$y2
+x$n12 <- x$n1 + x$n2
+
+x0 <- x[x$point == 1, ]
 ```
 
 # Nuisance variables
@@ -67,13 +84,15 @@ We have 3 such covariates in our example:
 
 ```{r}
 m1 <- glm(
-    y ~
+    n ~
         pconif + I(pconif^2) + ahm + thf +
         hr + I(hr^2) + yday + wind,
-    data = x, family = poisson
+    data = x0, family = poisson
 )
 summary(m1)
 
+visreg::visreg(m1, "pconif", scale = "linear") # quadratic
+visreg::visreg(m1, "pconif", scale = "response") # quadratic
 visreg::visreg(m1, "hr", scale = "linear") # quadratic
 visreg::visreg(m1, "hr", scale = "response") # back-transformed to response scale
 visreg::visreg(m1, "yday", scale = "response")
@@ -85,7 +104,7 @@ we want to set the values that maximize the prediction.
 Two nuisance variables have a negative effect, so we need to pick the min:
 
 ```{r}
-xnew <- x
+xnew <- x0
 xnew$yday <- min(xnew$yday)
 xnew$wind <- min(xnew$wind)
 ```
@@ -107,20 +126,20 @@ nuisance variables. The mean predicted abundance is higher when we optimize
 the nuisance variables:
 
 ```{r}
-x$Pred <- predict(m1, x, type = "response")
-x$PredNew <- predict(m1, xnew, type = "response")
-mean(x$Pred)
-mean(x$PredNew)
+x0$Pred <- predict(m1, x0, type = "response")
+x0$PredNew <- predict(m1, xnew, type = "response")
+mean(x0$Pred)
+mean(x0$PredNew)
 
-x |> ggplot(aes(x = pconif, y = Pred, col = yday)) +
+x0 |> ggplot(aes(x = pconif, y = Pred, col = yday)) +
     geom_point() +
     theme_light()
 
-x |> ggplot(aes(x = pconif, y = PredNew)) +
+x0 |> ggplot(aes(x = pconif, y = PredNew)) +
     geom_point() +
     theme_light()
 
-x |> ggplot(aes(x = Pred, y = PredNew, col = yday)) +
+x0 |> ggplot(aes(x = Pred, y = PredNew, col = yday)) +
     geom_point() +
     geom_abline(intercept = 0, slope = 1, lty = 2) +
     theme_light()
@@ -152,9 +171,11 @@ We will use the 150 m radius and assume that distance effects are negligible wit
 We will use the log of the area of a circle with 150 m radius as an offset:
 
 ```{r}
-x$logA_150m <- log(pi * (150 / 100)^2)
+# x0$logA_150m <- log(pi * (150 / 100)^2)
+x0$logA_150m <- log((pi * 150^2) / 10^4)
 
-m2 <- update(m1, y ~ . + offset(logA_150m))
+m2 <- update(m1, . ~ . + offset(logA_150m))
+m2a <- update(m1, offset = logA_150m)
 summary(m2)
 ```
 
@@ -182,28 +203,6 @@ First we need to get the counts corresponding to the 3 time intervals:
 - 0--3.3 mins
 - 0--6.6 mins
 - 0--10 mins
-
-```{r}
-if (!interactive()) {
-    dp <- readRDS("../data/ab_birds_site_year_pt.rds")
-} else {
-    dp <- readRDS("data/ab_birds_site_year_pt.rds")
-}
-
-y123 <- mefa4::groupSums(
-    cbind(
-        y1 = dp$removal$int1[, spp],
-        y2 = dp$removal$int2[, spp],
-        y3 = dp$removal$int3[, spp]
-    ),
-    1,
-    dp$vars$site_year
-)
-x <- data.frame(y123[rownames(x), ], x)
-
-# cumulative counts
-x$y12 <- x$y1 + x$y2
-```
 
 The models for the 1st and the 1st + 2nd time intervals are:
 
@@ -269,14 +268,14 @@ the `Count` values corresponding to the time and distance intervals.
 
 ```{r}
 Methods <- c("3.3min", "6.6min", "10min")
-x$Method <- factor(sample(
+x0$Method <- factor(sample(
     Methods,
-    nrow(x),
+    nrow(x0),
     replace = TRUE
 ), levels = Methods)
-x$y_Rnd <- x$y1
-x$y_Rnd[x$Method == "6.6min"] <- x$y12[x$Method == "6.6min"]
-x$y_Rnd[x$Method == "10min"] <- x$y[x$Method == "10min"]
+x0$y_Rnd <- x0$n1
+x0$y_Rnd[x0$Method == "6.6min"] <- x0$n12[x0$Method == "6.6min"]
+x0$y_Rnd[x0$Method == "10min"] <- x0$n[x0$Method == "10min"]
 ```
 
 This next model will have `y_Rnd` as the response, and we add

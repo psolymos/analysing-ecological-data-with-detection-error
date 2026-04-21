@@ -81,6 +81,7 @@ When visiting each site $T$ times, the observed data will be organized in a
 $n$ by $T$ matrix as how we saw it for occupancy:
 
 ```{r}
+T <- 5
 Y <- matrix(NA, n, T)
 for (t in 1:T) {
     Y[, t] <- rbinom(n = n, size = N, prob = p.true)
