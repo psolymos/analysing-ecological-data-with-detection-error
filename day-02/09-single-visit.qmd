@@ -1,5 +1,5 @@
 ---
-title: "Fitting N-mixture models"
+title: "Single visit based approaches"
 subtitle: "Analysing Ecological Data with Detection Error"
 date: "`r Sys.Date()`"
 author: "Péter Sólymos"

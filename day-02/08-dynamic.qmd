@@ -1,5 +1,5 @@
 ---
-title: "Fitting N-mixture models"
+title: "Dynamic N-mixture models"
 subtitle: "Analysing Ecological Data with Detection Error"
 date: "`r Sys.Date()`"
 author: "Péter Sólymos"
