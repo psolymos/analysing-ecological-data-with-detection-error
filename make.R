@@ -3,7 +3,6 @@
 # Rscript --vanilla make.R --docs
 # Rscript --vanilla make.R --day 1
 # Rscript --vanilla make.R --session '01'
-# Rscript --vanilla make.R --session '01' --docs
 # Rscript --vanilla make.R --session '01' --format beamer
 
 if (!requireNamespace("rconfig", quietly = TRUE)) {
@@ -13,6 +12,17 @@ CONFIG <- rconfig::rconfig()
 str(CONFIG)
 
 FORMAT <- rconfig::value(CONFIG$format, "all")
+DOCS <- rconfig::value(CONFIG$docs, FALSE)
+if (DOCS) {
+  unlink("docs/*", recursive = TRUE)
+  fl <- list.files(".", recursive = TRUE, full.names = TRUE)
+  fl <- fl[grep("\\.html$", fl)]
+  file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
+  file.copy("index.qmd", "docs/index.qmd", overwrite = TRUE)
+  try(quarto::quarto_render("docs/index.qmd", output_format = "html"))
+  unlink("docs/index.qmd")
+  quit(save = "no", status = 0)
+}
 
 if (!is.null(CONFIG$day) && !is.null(CONFIG$session)) {
   stop("Cannot specify both day and session")
@@ -31,6 +41,8 @@ if (!is.null(CONFIG$day)) {
   )
   fl <- list.files(dir, recursive = TRUE)
   fl <- fl[grep("\\.qmd$", fl)]
+  print(fl)
+  OK <- logical(length(fl))
 }
 
 if (!is.null(CONFIG$session)) {
@@ -42,9 +54,9 @@ if (!is.null(CONFIG$session)) {
     fl <- fl[grepl(SESSION, basename(fl)) & !grepl("_tmp", fl)]
   }
   print(fl)
+  OK <- logical(length(fl))
 }
 
-OK <- logical(length(fl))
 for (i in fl) {
   r <- try(quarto::quarto_render(file.path(dir, i), output_format = FORMAT))
   OK[i == fl] <- !inherits(r, "try-error")
@@ -56,18 +68,6 @@ if (any(!OK)) {
   cat("\n")
 } else {
   message("All files rendered successfully.")
-}
-
-DOCS <- rconfig::value(CONFIG$docs, FALSE)
-if (DOCS) {
-  unlink("docs/*", recursive = TRUE)
-  fl <- list.files(".", recursive = TRUE, full.names = TRUE)
-  fl <- fl[grep("\\.html$", fl)]
-  file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
-  file.copy("index.qmd", "docs/index.qmd", overwrite = TRUE)
-  try(quarto::quarto_render("docs/index.qmd", output_format = "html"))
-  unlink("docs/index.qmd")
-  # quit(save = "no", status = 0)
 }
 
 quit(save = "no", status = ifelse(all(OK), 0, 1))
