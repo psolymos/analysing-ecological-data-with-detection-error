@@ -19,6 +19,7 @@ if (DOCS) {
   file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
   file.copy("index.qmd", "docs/index.qmd", overwrite = TRUE)
   try(quarto::quarto_render("docs/index.qmd", output_format = "html"))
+  unlink("docs/index.qmd")
   quit(save = "no", status = 0)
 }
 FORMAT <- rconfig::value(CONFIG$format, "all")
