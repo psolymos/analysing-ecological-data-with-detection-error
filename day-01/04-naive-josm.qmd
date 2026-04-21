@@ -1,5 +1,5 @@
 ---
-title: "Naïve estimates of occupancy and abundance"
+title: "Naïve estimates of occupancy and abundance: JOSM data example"
 subtitle: "Analysing Ecological Data with Detection Error"
 date: "`r Sys.Date()`"
 author: "Péter Sólymos"

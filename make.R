@@ -2,8 +2,9 @@
 # Rscript --vanilla make.R
 # Rscript --vanilla make.R --docs
 # Rscript --vanilla make.R --day 1
-# Rscript --vanilla make.R --session 01
-# Rscript --vanilla make.R --session 01 --format beamer
+# Rscript --vanilla make.R --session '01'
+# Rscript --vanilla make.R --session '01' --docs
+# Rscript --vanilla make.R --session '01' --format beamer
 
 if (!requireNamespace("rconfig", quietly = TRUE)) {
   install.packages("rconfig")
@@ -11,17 +12,6 @@ if (!requireNamespace("rconfig", quietly = TRUE)) {
 CONFIG <- rconfig::rconfig()
 str(CONFIG)
 
-DOCS <- rconfig::value(CONFIG$docs, FALSE)
-if (DOCS) {
-  unlink("docs/*", recursive = TRUE)
-  fl <- list.files(".", recursive = TRUE, full.names = TRUE)
-  fl <- fl[grep("\\.html$", fl)]
-  file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
-  file.copy("index.qmd", "docs/index.qmd", overwrite = TRUE)
-  try(quarto::quarto_render("docs/index.qmd", output_format = "html"))
-  unlink("docs/index.qmd")
-  quit(save = "no", status = 0)
-}
 FORMAT <- rconfig::value(CONFIG$format, "all")
 
 if (!is.null(CONFIG$day) && !is.null(CONFIG$session)) {
@@ -49,8 +39,9 @@ if (!is.null(CONFIG$session)) {
   fl <- list.files(dir, recursive = TRUE, full.names = TRUE)
   fl <- fl[grep("\\.qmd$", fl)]
   if (SESSION != "0") {
-    fl <- fl[startsWith(basename(fl), SESSION)]
+    fl <- fl[grepl(SESSION, basename(fl)) & !grepl("_tmp", fl)]
   }
+  print(fl)
 }
 
 OK <- logical(length(fl))
@@ -65,6 +56,18 @@ if (any(!OK)) {
   cat("\n")
 } else {
   message("All files rendered successfully.")
+}
+
+DOCS <- rconfig::value(CONFIG$docs, FALSE)
+if (DOCS) {
+  unlink("docs/*", recursive = TRUE)
+  fl <- list.files(".", recursive = TRUE, full.names = TRUE)
+  fl <- fl[grep("\\.html$", fl)]
+  file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
+  file.copy("index.qmd", "docs/index.qmd", overwrite = TRUE)
+  try(quarto::quarto_render("docs/index.qmd", output_format = "html"))
+  unlink("docs/index.qmd")
+  # quit(save = "no", status = 0)
 }
 
 quit(save = "no", status = ifelse(all(OK), 0, 1))
