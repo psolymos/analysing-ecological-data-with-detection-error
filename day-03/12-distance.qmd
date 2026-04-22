@@ -176,7 +176,7 @@ As we saw before, the Shiny app can be used to copy the distance function that w
 
 # Simulations
 
-We will apply this new found knowledge to our bSims world: the observer is in the middle of the landscape, and each vocalization event is aither detected or not, depending on the distance. Units of `tau` are given on 100 m units, so that corresponding  density estimates will refer to ha as the unit area.
+We will apply this new found knowledge to our bSims world: the observer is in the middle of the landscape, and each vocalization event is either detected or not, depending on the distance. Units of `tau` are given on 100 m units, so that corresponding  density estimates will refer to ha as the unit area.
 
 In this example, we want all individuals to be equally available, so we are going to override all behavioral aspects of the simulations by the `initial_location` argument when calling `bsims_animate`. We set `density` and `tau` high enough to get many detections in this example.
 

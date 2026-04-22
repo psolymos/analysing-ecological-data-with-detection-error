@@ -248,6 +248,7 @@ Read more:
 - <https://github.com/psolymos/bSims/blob/master/inst/bsims-paper/appendix.R>
 - <https://peter.solymos.org/bSims/articles/bsims02-layers.html>
 - <https://peter.solymos.org/bSims/articles/bsims03-workflow.html>
+- Rigby E (2016) Simulating effects of imperfect detectability in bird surveys. PhD Thesis, Univ. Minnesota. <https://hdl.handle.net/11299/193439>
 - Shinylive versions of the apps: <https://peter.solymos.org/bSims/articles/bsims04-apps.html>
 
 ```{r}

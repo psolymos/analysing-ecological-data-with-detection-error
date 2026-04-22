@@ -204,7 +204,7 @@ legend("bottomright",
 
 # Real data
 
-Let's pick a species from the JOSM data set. For predictors, we will use a variable capturing date (`DAY`; standardized ordinal day of the year) and an other one capturing time of day (`TSSR`; time since local sunrise). The data frame `X` contains the predictors. The matrix `Y` contains the counts of newly counted individuals binned into consecutive time intervals: cell values are the $Y_{ij}$'s. The `D` object is another matrix mirroring the structure of `Y` but instead of counts, it contains the interval end times: cell values are the $t_{ij}$'s.
+Let's pick a species from the JOSM data set. For predictors, we will use a variable capturing date (`DAY`; standardized ordinal day of the year) and an other one capturing time of day (`TSSR`; time since local sunrise, see the [suntools](https://CRAN.R-project.org/package=suntools) package). The data frame `X` contains the predictors. The matrix `Y` contains the counts of newly counted individuals binned into consecutive time intervals: cell values are the $Y_{ij}$'s. The `D` object is another matrix mirroring the structure of `Y` but instead of counts, it contains the interval end times: cell values are the $t_{ij}$'s.
 
 ```{r}
 yall <- Xtab(
@@ -279,6 +279,8 @@ Me_AIC[order(Me_AIC$AIC), ]
 
 Me_Best <- get(rownames(Me_AIC)[Me_AIC$delta_AIC == 0])
 summary(Me_Best)
+
+MuMIn::model.sel(Me0, Me1, Me2)
 ```
 
 To visually capture the time-varying effects, we make some plots using base graphics, colors matching the time-varying predictor. This way we can not only assess how availability probability (given a fixed time interval) is changing with the values of the predictor, but also how the cumulative distribution changes with time.
