@@ -14,24 +14,19 @@ format:
 From
 <https://github.com/psolymos/lhreg/blob/master/vignettes/lhreg.Rmd>
 
-## Introduction
-
-This document is a supporting material for the manuscript entitled
-*Phylogeny and species traits predict songbird detectability* by
-Peter Solymos, Steven M. Matsuoka, Diana Stralberg, Erin M. Bayne, and Nicole K. S. Barker.
-
-The **lhreg** R package contains the (1) data, (2) analysis code used in the manuscript,
-and (3) code required to summarize the results and produce tables and figures.
-
-The R package is hosted on [GitHub](https://github.com/borealbirds/lhreg),
-Please submit issues [here](https://github.com/borealbirds/lhreg/issues).
-
-The package is archived on Zenodo under the DOI [10.5281/zenodo.574886](https://zenodo.org/badge/latestdoi/90998177).
+# Introduction
 
 The present document can be viewed as `vignette(topic = "lhreg", package = "lhreg")`.
+To install the package, use `remotes::install_github("psolymos/lhreg")`.
 
+Based on the paper:
 
-## Components of detectability
+Sólymos, P., Matsuoka, S. M., Stralberg, D., Barker, N. K. S., and 
+Bayne, E. M., 2018. Phylogeny and species traits predict bird detectability. 
+Ecography, 41: 1595--1603.
+[DOI: 10.1111/ecog.03415](https://doi.org/10.1111/ecog.03415)
+
+# Components of detectability
 
 The manuscript refer to singing rate ($SR$, here we also refer to it as `phi`)
 and detection distance ($DD$, which we refer to as `tau`),
@@ -49,9 +44,7 @@ $q=DD^2~(1-exp(-r^2 / DD^2))~/~r^2$, where $r$ is the counting radius (i.e. not
 counting individuals beyond this distance from the observer).
 Probability of detection is the product to the two components: $pq$.
 
-## Data and data processing
-
-### Variables
+# Variables
 
 The `lhreg_data` is a data frame with all response variables
 (`logphi` is log singing rate, `logtau` is log detection distance)
@@ -105,52 +98,17 @@ knitr::kable(
 )
 ```
 
-### Phylogenetic correlations
+We averaged the 1000 pseudo-posterior trees from Jetz et al.
+(2012) with Ericson backbone to represent the phylogenetic relationships among the species.
+These were turned into the phylogenetic correlation matrix, `cor_matrix`.
 
-This code was used to average the 1000 pseudo-posterior trees from Jetz et al.
-(2012) with Ericson backbone to represent the phylogenetic relationships among the species:
-
-```{r}
-library(ape)
-mph <- read.nexus("11960.tre") # 1000 trees with Ericson backbone
-lhreg_tree <- consensus(mph)
-table(sapply(mph, function(z) length(z$tip.label)))
-CORR <- TRUE
-vv <- list()
-vv[[1]] <- vcv(mph[[1]], corr = CORR)
-for (i in 2:length(mph)) {
-    v <- vcv(mph[[i]], corr = CORR)
-    v <- v[rownames(vv[[1]]), colnames(vv[[1]])]
-    vv[[i]] <- v
-}
-vvv <- v
-for (i in 1:length(v)) {
-    vvv[i] <- mean(sapply(vv, function(z) z[i]))
-}
-spp <- intersect(rownames(lhreg_data), rownames(vvv))
-vvv <- vvv[spp, spp]
-cor_matrix <- as.matrix(nearPD(vvv, corr = TRUE)$mat)
-```
-
-The object `cor_matrix` is part of the **lhreg** package,
-relative phylogenies can be reconstructed from it:
-
-```{r heatmap}
-library(ape)
-data(cor_matrix)
-data(lhreg_tree)
-str(cor_matrix)
-heatmap(cor_matrix)
-```
-
-
-## Analysis
+# Analysis
 
 Linear model were used to screen trait variables, so that we compared
 that *full* model with the intercept only *null* model, with or without
 phylogenetic correlation.
 
-### Variable screening for SR
+## Variable screening for SR
 
 ```{r}
 library(lhreg)
@@ -183,7 +141,7 @@ mpx2 <- step(mpx)
 summary(mpx2)
 ```
 
-### Variable screening for DD
+## Variable screening for DD
 
 ```{r}
 y <- lhreg_data$logtau
@@ -203,8 +161,8 @@ round(structure(100 * amt[, "Sum Sq"] / sum(amt[, "Sum Sq"]),
 ), 1)
 
 mt0 <- lm(y ~ 1)
-summary(mp0) # null model for DD
-summary(mp) # full model for DD
+summary(mt0) # null model for DD
+summary(mt) # full model for DD
 ## evaluating interactions
 mtx <- lm(y ~ logmass + Mig2 + Nesthm + xMaxFreqkHz + Hab2 +
     logmass:xMaxFreqkHz + Hab2:xMaxFreqkHz, lhreg_data)
@@ -212,7 +170,7 @@ mtx2 <- step(mtx)
 summary(mtx2)
 ```
 
-### Mixed model selection
+## Mixed model selection
 
 The following models were compared, the prefix `t` and `p`
 indicates `tau` (detection distance) and `phi` (singing rate):
@@ -223,6 +181,7 @@ indicates `tau` (detection distance) and `phi` (singing rate):
 4. `Mlb` as combined model $M_{\lambda\beta}$.
 
 ```{r}
+#| eval: false
 met <- "DE" # can use "SANN", "Nelder-Mead" is quickest
 x <- lhreg_data
 vc <- cor_matrix
@@ -280,6 +239,7 @@ It is possible to use `lambda` > 1 but it leads to extremely low likelihoods
 in our case.
 
 ```{r}
+#| eval: false
 ## set up lambda values to evaluate at
 lam <- seq(0, 1, by = 0.01)
 
@@ -325,6 +285,7 @@ non-parametric confidence intervals for the estimated parameters
 (not presented in the manuscript).
 
 ```{r}
+#| eval: false
 n <- nrow(x) # we will do n runs
 
 cl <- makeCluster(4) # parallel if you wish
@@ -355,6 +316,7 @@ input object (without the observation error) to refit the model and returns
 simulated values and estimates.
 
 ```{r}
+#| eval: false
 nsim <- 999
 ## simulated data is nice, thus quick optimization works
 metQ <- "Nelder-Mead"
@@ -383,6 +345,7 @@ species included), and returns the bootstrap distribution of the prediction
 that can be used to calculate quantile based prediction intervals.
 
 ```{r}
+#| eval: false
 cl <- makeCluster(4)
 pit <- pred_int(tM0b, pb_tM0b, cl = cl)
 pip <- pred_int(pMlb, pb_pMlb, cl = cl)
@@ -606,6 +569,7 @@ Load the 1000 posterior trees, pick one and plot trait values
 alongside the tree.
 
 ```{r}
+#| eval: false
 library(ape)
 load(system.file("extdata", "mph.rda", package = "lhreg"))
 tre <- mph[[1000]] # pick one tree
