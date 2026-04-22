@@ -15,10 +15,16 @@ format:
 
 <https://github.com/psolymos/sqpad-paper/blob/main/analysis/04-field-data.R>
 
+Use bSims to compare pq and joint setups and explain what it means.
+
 ```{r}
 library(detect)
-
 set.seed(0)
+```
+
+Simulation:
+
+```{r}
 n <- 100
 x <- rnorm(n)
 D <- exp(-2 + 0.5 * x)
@@ -33,7 +39,11 @@ N <- rpois(n, D * A)
 Y <- rbinom(n, N, p)
 
 df <- data.frame(x = x, y = Y)
+```
 
+Estimate effects:
+
+```{r}
 m <- sqpad(y ~ x | 1, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
 
 print(m)
@@ -52,16 +62,22 @@ fitted(m)
 predict(m, type = "link")
 predict(m, newdata = df[1:10, ], type = "response")
 predict(m, newdata = df[1:10, ], type = "link")
+```
 
+Compare different models:
+
+```{r}
 m0 <- sqpad(y ~ 1 | 1, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
 m1 <- sqpad(y ~ 1 | x, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
 m2 <- sqpad(y ~ x | x, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
 
 AIC(m, m0, m1, m2) # m2 is best
 BIC(m, m0, m1, m2) # this is needed!
+```
 
-# average probability
+Average probability
 
+```{r}
 set.seed(5)
 n <- 1000
 x <- rnorm(n)
@@ -106,9 +122,11 @@ m2MC <- sqpad(y ~ x | 1,
 )
 
 cbind(mAP = coef(mAP), mMC = coef(mMC), m2AP = coef(m2AP), m2MC = coef(m2MC))
+```
 
-# convolution likelihood
+Convolution likelihood
 
+```{r}
 D <- 1
 phi <- 0.25
 tau <- 1.2
