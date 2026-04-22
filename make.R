@@ -15,9 +15,14 @@ FORMAT <- rconfig::value(CONFIG$format, "all")
 DOCS <- rconfig::value(CONFIG$docs, FALSE)
 if (DOCS) {
   unlink("docs/*", recursive = TRUE)
-  fl <- list.files(".", recursive = TRUE, full.names = TRUE)
-  fl <- fl[grep("\\.html$", fl)]
+  fl0 <- list.files(".", recursive = TRUE, full.names = TRUE)
+
+  fl <- fl0[grepl("\\.html$", fl0) & substr(basename(fl0), 3, 3) == "-"]
   file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
+
+  fl <- fl0[grepl("\\.pdf$", fl0) & substr(basename(fl0), 3, 3) == "-"]
+  file.copy(fl, file.path("docs", basename(fl)), overwrite = TRUE)
+
   file.copy("index.qmd", "docs/index.qmd", overwrite = TRUE)
   try(quarto::quarto_render("docs/index.qmd", output_format = "html"))
   unlink("docs/index.qmd")

@@ -1,5 +1,5 @@
 ---
-title: "Analysing data from audio recordings and camera traps"
+title: "Analysing data from audio recordings"
 subtitle: "Analysing Ecological Data with Detection Error"
 date: "`r Sys.Date()`"
 author: "Péter Sólymos"
