@@ -50,6 +50,9 @@ levels(x$HAB)[levels(x$HAB) %in%
 x$OBS <- as.factor(x$ObserverID)
 ```
 
+
+![](images/qpad-sketch.jpg)
+
 ## Duration and distance intervals
 
 
