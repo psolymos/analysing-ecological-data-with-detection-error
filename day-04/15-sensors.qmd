@@ -35,6 +35,16 @@ recordings can be stored in perpetuity to be transcribed
 later, ARUs can be programmed to record at select times and dates over long
 time periods that would be prohibitive using human observers.
 
+When combining human and ARU based counts, it is important that we understand how the two types of counts relate to each other.
+There are different approaches to make them comparable, especially with respect to the sensitivity (boosting) of the signal from ARUs.
+Signal strength (sound pressure levels) from ARUs relate to distance, this it can be used
+to make sure the differences are understood.
+
+- Triangulation methods: using time-synced ARU grids to track vocalization events in space and time, use this to build a relationship between distance and sound pressure levels
+- Paired sampling: simultaneous sampling by human observers and ARUs at the same locations
+- Distance calibration: measuring distances in the field and recoding the vocalization events, so a model between the field based distance and sound pressure levels can be established
+- Playback experiments: broadcasting known signals at known distances and recording them by ARUs to establish the relationship between sound pressure levels and distance
+
 Bird point counts have been traditionally done by human observers. Combining
 ARU data with traditional point counts thus require an understanding of
 how the ARU based counts relate to counts made by human observer in the field.
@@ -408,10 +418,7 @@ see where it fails. We will explore the following two situations:
 (1) sample size and number of detections is small, (2) sampling is
 biased with respect to habitat strata.
 
-
-
 ```{r}
-#| eval: false
 X$open <- ifelse(X$Class_Name %in% c(
     "Open Herb/Grass",
     "Open coniferous", "Open Mature Deciduous", "Open Mixed",
@@ -458,4 +465,4 @@ abline(h = 1, v = 1, lty = 2)
 abline(lm(Est ~ Delta.emp, Delta_summary), col = 2)
 ```
 
-`prop_open` 0 vs. 1 leads to different deviation from the 1:1 line, eplain why.
+`prop_open` 0 vs. 1 leads to different deviation from the 1:1 line, explain why.
