@@ -49,6 +49,7 @@ if (ask) {
         "MuMIn",
         "opticut",
         "partykit",
+        "plotrix",
         "pROC",
         "pscl",
         "quarto",
@@ -75,7 +76,14 @@ if (ask) {
           cat("  - Installing R package ", i, " ... OK\n")
         }
       } else {
-        try(install.packages(to_inst))
+        try(install.packages(
+          to_inst,
+          repos = c(
+            "CRAN" = getOption("repos"),
+            "INLA" = "https://inla.r-inla-download.org/R/stable"
+          ),
+          dependencies = TRUE
+        ))
       }
     }
 

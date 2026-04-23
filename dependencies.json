@@ -11,6 +11,12 @@
       "source": "cran"
     },
     {
+      "package": "coda",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
       "package": "corrplot",
       "installed": false,
       "dev": false,
@@ -54,6 +60,12 @@
     },
     {
       "package": "ggplot2",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "INLA",
       "installed": false,
       "dev": false,
       "source": "cran"
@@ -117,6 +129,12 @@
       "source": "cran"
     },
     {
+      "package": "plotrix",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
       "package": "pROC",
       "installed": false,
       "dev": false,
@@ -160,6 +178,12 @@
     },
     {
       "package": "rgl",
+      "installed": false,
+      "dev": false,
+      "source": "cran"
+    },
+    {
+      "package": "rjags",
       "installed": false,
       "dev": false,
       "source": "cran"
