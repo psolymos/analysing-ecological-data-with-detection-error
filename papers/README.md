@@ -39,7 +39,7 @@ Methods in Ecology and Evolution, 4: 1047--1058.
 Lele, S. R., Sólymos, P. 2025.
 Single bin QPAD (SQPAD) approach for robust analysis of point count data
 with detection error.
-Ornithological Applications, in press.
+Ornithological Applications, 128: 1--14. DOI 10.1093/ornithapp/duaf078
 [Preprint](https://github.com/psolymos/sqpad-paper)
 
 Sólymos, P., Matsuoka, S. M., Cumming, S. G., Stralberg, D., Fontaine, P.,

@@ -11,18 +11,143 @@ format:
   pdf: default
 ---
 
-<https://github.com/psolymos/sqpad-paper>
-
-<https://github.com/psolymos/sqpad-paper/blob/main/analysis/04-field-data.R>
-
-Use bSims to compare pq and joint setups and explain what it means.
-
 ```{r}
 library(detect)
 set.seed(0)
 ```
 
-Simulation:
+# Introduction
+
+This session is based on the paper:
+
+Lele, S. R., Sólymos, P. 2025.
+Single bin QPAD (SQPAD) approach for robust analysis of point count data
+with detection error.
+Ornithological Applications, 128: 1--14. DOI 10.1093/ornithapp/duaf078
+[Preprint](https://github.com/psolymos/sqpad-paper)
+
+- Distance sampling requires correct estimation of the distances. Does not take into account the survey duration.
+- Removal sampling requires tracking individuals and does not take into account the effect of the distance.
+- QPAD accounts for both distance and survey duration but uses an independence assumption. It inherits the problems of distance and removal sampling. 
+- N-mixture type approaches require multiple, independent visits and close population assumption. Logistically and financially difficult and biologically not justifiable. 
+
+We propose a method that addresses many of these issues without making any additional assumptions, the Single Bin QPAD (SQPAD), that:
+
+- Does not need individual distance estimation. It only requires that one can determine if an individual is within a specified spatial buffer. 
+- Does not require tracking individuals. 
+- Does not need the independence assumption of QPAD. 
+- Does not need replicate surveys or multiple simultaneous observers. 
+- The trick behind the SQPAD is the variable effort survey design. 
+
+## Notation
+
+Let $s=1,2,⋯,S$ where $S$ is the total number of locations that are surveyed.
+
+- $y_s$ is the occupancy status or abundance at the $s$-th survey location
+- $X_s$ is a vector of habitat covariates that affect abundance and density at the time and location of the $s$-th survey
+- $Z_s$ is a vector of habitat covariates that affect detection at the time and location of the $s$-th survey
+- $t_s$  is the survey duration at the $s$-th survey
+- $r_s$ is the radius of the circular buffer around the $s$-th survey 
+- Survey area around the $s$-th survey location is $A_s=πr_s^2$.
+- Let $R_{max}$ be the maximum radius one would survey at any survey location
+- Let $R_{min}>0$ denote the minimum radius surveyed at any survey location.
+- Let $T_{max}$ denote the maximum amount of time spent at any survey location. 
+- Let $T_{min}>0$ denote the minimum amount of time one spends at any survey location.
+
+## Variable Effort Survey Design
+
+- Step 1: Choose a location from all the potential survey locations. This could be based on simple random sampling, stratified simple random sampling or any other sampling design one wishes to use.
+- Step 2: Choose a number from $(T_{min},2T_{min},⋯,T_{max}/T_{min})$ randomly where $T_{min}$ is the minimum amount of time spent at a survey location. This is the amount of time one would spend at the chosen location.
+- Step 3: Choose a number from $(R_{min},2R_{min},⋯,R_{max}/R_{min})$ randomly where $R_{min}$ is the smallest radius for the buffer at a survey location. This is the survey radius at the chosen location.
+- Step 4: Note the number of individuals or occupancy status observed at that survey location within the survey radius in Step 3 and during the survey duration in Step 2.
+- Step 5: Repeat Steps 1-4, until a requisite number of locations are surveyed.
+
+We want to emphasize that the survey radius and survey duration are different for each survey location. This is in contrast to the usual practice of having these to be the same for all survey locations. We call this a variable effort survey design.
+
+Data collected under the variable effort survey design are $(y_s,X_s,Z_s,t_s,r_s)$, namely, observed abundance or occupancy status, covariates for abundance, covariates for detection, survey duration, and survey radius for each survey.
+
+We note that there could be habitat covariates that affect both detection and abundance. Such habitat covariates will be part of both $X_s$ and $Z_s$ vectors. Of course, there may be no habitat covariates and we only have $(y_s,t_s,r_s)$. 
+
+## Statistical model: Count data
+
+Process model:
+$N_s |(X_s,A_s)∼Poisson(D_s A_s)$, where $D_s$ denotes the density and $N_s$ is the true abundance at the survey location. We can model $D_s$ as a log-linear function of covariates $X_s$.
+
+Observation model: 
+$Y_s |(N_s=n_s,Z_s,t_s,r_s)∼Binomial(n_s,p_s)$, where $p_s$ denotes the probability of detecting an individual at the $s$-th survey time and location.
+
+## Statistical model: Occupancy data
+
+Process model: 
+$N_s |(X_s,A_s)∼Binomial(1,ψ_s)$, where $ψ_s$ is the probability of occupancy. We model the probability of occupancy as a function of the density,$ψ_s=1-exp(-D_s A_s)$
+
+Observation model: 
+$Y_s |(N_s=n_s,Z_s,t_s,r_s)∼Binomial(n_s,p_s)$, where $p_s$ denotes the probability of detecting an individual at the $s$-th survey time and location.
+
+## Model for probability of detection: Duration only
+
+- An individual is detected only if that individual emanates a cue (which is always perceived)
+- Cues are emanated according to a Time-Homogeneous Poisson Process with rate $\delta >0$
+- Individuals emanate cues independent of each other.
+- Probability that an individual is detected during the survey duration $(0,T)$ is $1-exp(-\delta T)$. 
+
+## Model for probability of detection: Duration and distance effect
+
+- Individuals are at different distances from the observer. 
+- Farther an individual is from the observer, smaller is the chance that a cue emanated by that individual will be detected by the observer.
+- This corresponds to a thinned point process. The perceived cue rate is reduced.
+
+## Incorporating the distance effect on perception
+
+- Similar to the visibility functions in distance sampling, let $\nu(r,\phi)$ be any function such that $\nu(0,\phi)=1$ and decreases to 0 as the distance increases.
+- Perceived cue rate is $\delta\nu(r,\phi)$
+- Probability that an individual at distance $r$ is detected during the survey duration $(0,T)$ is $1-exp(-\delta\nu(r,\phi) T)$.
+- Exponential decay in perception will lead us to $1-exp(-\delta exp(-\phi r) T)$.
+- Half Gaussian decay in perception will lead us to $1-exp(-\delta exp(-\phi r^2) T)$.
+- We can include the covariate effect on the cue rate by using $\delta = \delta_0exp(Z\gamma)$
+
+## Can we estimate the parameters using only a single visit?
+
+It is possible to estimate the detection probability and density if: 
+
+- There are covariates that affect detection but not the density. In our case, these are survey duration and survey radius.
+- Probability of detection varies continuously from 0 to 1 over the potential range of the covariates that affect detection. In our case, if the survey duration is 0, probability of detection is 0. Also, as the survey duration increases, probability of detection increases to 1. 
+
+## What information do we collect?
+
+- We observe that that there 3 individuals (when in reality there are 5 individuals)
+- Full information corresponds to $(t_1,d_1),(t_2,d_2),(t_3,d_3)$
+- Distance sampling uses $d_1,d_2,d_3$
+- Removal sampling uses $t_1, t_2,t_3$
+- QPAD uses full information but fits the independence model
+- SQPAD uses $(y_s=3,t_s=10,r_s=100)$ (Three individuals during 10 minutes and within 100 mtrs)
+
+## ARU data analysis
+
+- There is a relationship between sound pressure and distance.
+- We can use this relationship to replace distance by sound pressure in the distance effect component of the probability of detection (no need for transformation to distance)
+- We can use estimated distance to compute effective area. This is needed for computing density.
+- Area is a random effect with known mean and known variance based on the calibration studies.
+- This is likely to be robust because we only need to know if the distance is smaller than a specified value and not the exact distance. 
+
+## Discussion
+
+- It seems mysterious that one can correct for detection error without auxiliary information.
+- Key is variable survey duration and variable survey radius. These can be used as covariates.
+- These covariates affect only the detection process (not the density)
+- Key assumption: Probability of detection increases from 0 to 1 as survey duration increases from 0 to $\infty$. (Satisfies the RSPF condition)
+- Misclassfication of an individual inside or outside the buffer can affect the inferences. But simulations suggest SQPAD in general, and occupancy in particular, robust against this error. 
+- No distraction by trying to track individuals or distances
+- No replicate surveys
+- More reliable counts and occupancy status because of less distraction
+- Logistically and financially advantageous
+- Currently available data can be analyzed using the composite likelihood
+
+# Simulations
+
+A full simulation example using bSims can be found at <https://github.com/psolymos/sqpad-paper>.
+
+Here we'll do statistical simulations to demonstrate how the functions work.
 
 ```{r}
 n <- 100
@@ -124,30 +249,110 @@ m2MC <- sqpad(y ~ x | 1,
 cbind(mAP = coef(mAP), mMC = coef(mMC), m2AP = coef(m2AP), m2MC = coef(m2MC))
 ```
 
-Convolution likelihood
+# Field data analysis
 
 ```{r}
-D <- 1
-phi <- 0.25
-tau <- 1.2
-n <- 200
+library(mefa4) # data manipulation
+library(detect)
+set.seed(1234)
 
-dur <- sample(1:10, n, replace = TRUE)
-dis <- sample(seq(0.25, 2, 0.25), n, replace = TRUE)
-A <- dis^2 * pi
-N <- rpois(n, D * A)
-dislist <- lapply(seq_len(n), function(i) {
-    dij <- rtriang(N[i], dis[i])
-    # pij is based on time of 1st detection and distance at 1st detection
-    pij <- 1 - exp(-dur[i] * phi * exp(-(dij)^2 / tau^2))
-    Yij <- rbinom(length(pij), 1, pij)
-    dij[Yij > 0]
-})
-Y <- sapply(dis, length)
-
-m4 <- sqpad.fit(
-    Y = Y, dis = dis, dur = dur, dislist = dislist,
-    type = "conv", det = "joint", Nmax = 20
+x <- detect::josm$surveys
+x$FOR <- x$Decid + x$Conif + x$ConifWet # forest
+x$AHF <- x$Agr + x$UrbInd + x$Roads # 'alienating' human footprint
+x$WET <- x$OpenWet + x$ConifWet + x$Water # wet + water
+cn <- c(
+    "Open", "Water", "Agr", "UrbInd", "SoftLin", "Roads", "Decid",
+    "OpenWet", "Conif", "ConifWet"
 )
-cbind(parameters = c(D = D, phi = phi, tau = tau), estimates = exp(m4$coef))
+x$HAB <- droplevels(find_max(x[, cn])$index) # drop empty levels
+levels(x$HAB)[levels(x$HAB) %in%
+    c("OpenWet", "Water", "Open", "Agr", "UrbInd", "Roads")] <- "Open"
+levels(x$HAB)[levels(x$HAB) %in%
+    c("Conif", "ConifWet")] <- "Conif"
+x$OBS <- as.factor(x$ObserverID)
+
+cts <- josm$counts[josm$counts$DetectType1 != "V", ]
+cts$DurDis <- paste(cts$Dur, cts$Dis)
+table(cts$DurDis)
+
+ydurdis <- Xtab(~ SiteID + DurDis + SpeciesID, cts)
+```
+
+## Transforming QPAD data into variable effort survey data
+
+
+```{r}
+spp <- "OVEN"
+y <- as.matrix(ydurdis[[spp]])
+
+yc <- cbind(
+    "3min/50m" = y[, "0-3min 0-50m"],
+    "5min/50m" = y[, "0-3min 0-50m"] + y[, "3-5min 0-50m"],
+    "10min/50m" = rowSums(y[, c("0-3min 0-50m", "3-5min 0-50m", "5-10min 0-50m")]),
+    "3min/100m" = rowSums(y[, c("0-3min 0-50m", "0-3min 50-100m")]),
+    "5min/100m" = rowSums(y[, c(
+        "0-3min 0-50m", "3-5min 0-50m",
+        "0-3min 50-100m", "3-5min 50-100m"
+    )]),
+    "10min/100m" = rowSums(y[, c(
+        "0-3min 0-50m", "3-5min 0-50m", "5-10min 0-50m",
+        "0-3min 50-100m", "3-5min 50-100m", "5-10min 50-100m"
+    )]),
+    "3min/Infm" = rowSums(y[, c(
+        "0-3min 0-50m",
+        "0-3min 50-100m", "0-3min 100+m"
+    )]),
+    "5min/Infm" = rowSums(y[, c(
+        "0-3min 0-50m", "3-5min 0-50m",
+        "0-3min 50-100m", "3-5min 50-100m",
+        "0-3min 100+m", "3-5min 100+m"
+    )]),
+    "10min/Infm" = rowSums(y[, c(
+        "0-3min 0-50m", "3-5min 0-50m", "5-10min 0-50m",
+        "0-3min 50-100m", "3-5min 50-100m", "5-10min 50-100m",
+        "0-3min 100+m", "3-5min 100+m", "5-10min 100+m"
+    )])
+)
+
+n <- nrow(yc)
+dis <- rep(c(0.5, 1), each = 3 * n)
+dur <- c(rep(c(3, 5, 10), each = n), rep(c(3, 5, 10), each = n))
+pid <- rep(1:n, 2 * 3)
+y <- c(
+    yc[, c("3min/50m")], yc[, c("5min/50m")], yc[, c("10min/50m")],
+    yc[, c("3min/100m")], yc[, c("5min/100m")], yc[, c("10min/100m")]
+)
+
+x2 <- data.frame(y = y, x[pid, ], dis = dis, dur = dur, pid = pid)
+x2[x2$pid == 1, ]
+```
+
+
+## Composite likelihood and SQPAD
+
+- We pretend as if these data are indepedent survey locations. Thus, the number of survey locations is now number of distance bins times the number of time bins. 
+- We apply the SQPAD estimation method. 
+- Computing the standard error cannot be based on the Hessian matrix. 
+- We can use non-parametric bootstrap where we bootstrap the original $S$ locations (not the artificially extended 'locations') (See the manuscript)
+
+## Data analysis
+
+```{r}
+# mod <- sqpad(y ~ FOR | DAY,
+#     data = x2, dis = x2$dis, dur = x2$dur,
+#     type = "full", det = "join", K = NULL
+# )
+
+mod <- sqpad(y ~ FOR | DAY + TSSR,
+    data = x2, dis = x2$dis, dur = x2$dur,
+    type = "approx", det = "join", K = NULL
+)
+
+summary(mod)
+
+X <- model.matrix(mod$formula$sta, x2[!duplicated(x2$pid), ])
+lam <- exp(drop(X %*% coef(mod)[startsWith(names(coef(mod)), "log.D_")]))
+summary(lam)
+
+# compare to naive and QPAD from session 13
 ```
