@@ -24,7 +24,7 @@ Lele, S. R., Sólymos, P. 2025.
 Single bin QPAD (SQPAD) approach for robust analysis of point count data
 with detection error.
 Ornithological Applications, 128: 1--14. DOI 10.1093/ornithapp/duaf078
-[Preprint](https://github.com/psolymos/sqpad-paper)
+[Preprint and reproducible code](https://github.com/psolymos/sqpad-paper)
 
 - Distance sampling requires correct estimation of the distances. Does not take into account the survey duration.
 - Removal sampling requires tracking individuals and does not take into account the effect of the distance.
@@ -175,6 +175,8 @@ print(m)
 summary(m)
 
 coef(m)
+c(-2, 0.5, log(0.25), log(1))
+
 nobs(m)
 vcov(m)
 confint(m)
@@ -198,55 +200,6 @@ m2 <- sqpad(y ~ x | x, data = df, dis = dis, dur = dur, type = "full", det = "jo
 
 AIC(m, m0, m1, m2) # m2 is best
 BIC(m, m0, m1, m2) # this is needed!
-```
-
-Average probability
-
-```{r}
-set.seed(5)
-n <- 1000
-x <- rnorm(n)
-D <- exp(-2 + 0.5 * x)
-phi <- 0.25
-tau <- 1
-dur <- sample(1:10, n, replace = TRUE)
-dis <- sample(seq(0.5, 2, 0.25), n, replace = TRUE)
-A <- dis^2 * pi
-
-dcorr <- 2 / 3
-p <- 1 - exp(-dur * phi * exp(-(dis * dcorr)^2 / tau^2))
-N <- rpois(n, D * A)
-Y <- rbinom(n, N, p)
-df <- data.frame(x = x, y = Y)
-
-np <- 1000
-dij <- rtriang(as.integer(np), 1)
-dij <- matrix(dij, nrow = n, ncol = np, byrow = TRUE)
-p2 <- rowMeans(1 - exp(-dur * phi * exp(-(dis * dij)^2 / tau^2)))
-Y2 <- rbinom(n, N, p2)
-df2 <- data.frame(x = x, y = Y2)
-
-plot(p, p2)
-abline(0, 1)
-
-mAP <- sqpad(y ~ x | 1,
-    data = df, dis = dis, dur = dur, type = "full",
-    det = "joint", K = NULL, montecarlo = FALSE, hessian = FALSE
-)
-mMC <- sqpad(y ~ x | 1,
-    data = df, dis = dis, dur = dur, type = "full",
-    det = "joint", K = NULL, montecarlo = TRUE, hessian = FALSE
-)
-m2AP <- sqpad(y ~ x | 1,
-    data = df2, dis = dis, dur = dur, type = "full",
-    det = "joint", K = NULL, montecarlo = FALSE, hessian = FALSE
-)
-m2MC <- sqpad(y ~ x | 1,
-    data = df2, dis = dis, dur = dur, type = "full",
-    det = "joint", K = NULL, montecarlo = TRUE, hessian = FALSE
-)
-
-cbind(mAP = coef(mAP), mMC = coef(mMC), m2AP = coef(m2AP), m2MC = coef(m2MC))
 ```
 
 # Field data analysis
