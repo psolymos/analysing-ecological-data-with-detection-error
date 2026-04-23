@@ -19,6 +19,13 @@ library(knitr)
 
 # Preamble
 
+Note: to install INLA, you have to use:
+
+```
+install.packages("INLA", 
+    repos = "https://inla.r-inla-download.org/R/stable", dep=TRUE)
+```
+
 ```{r}
 library(mefa4) # data manipulation
 library(mgcv) # GAMs
@@ -31,6 +38,7 @@ library(opticut) # optimal partitioning
 library(visreg) # regression visualization
 library(ResourceSelection) # marginal effects
 library(MuMIn) # multi-model inference
+library(INLA) # Integrated Nested Laplace Approximation
 library(detect)
 set.seed(1234)
 
@@ -332,14 +340,23 @@ DPG <- predict(MPG, newdata = x, type = "response")
 
 ## Poisson-Lognormal GLMM in lme4
 
-
 ```{r}
 MPLN <- glmer(y ~ Decid + (1 | SiteID), data = x, family = poisson, offset = o)
 
 DPLN <- drop(exp(X %*% fixef(MPLN)))
 ```
 
+## Poisson-Lognormal GLMM in INLA
 
+See a tutorial [here](https://www.precision-analytics.ca/articles/a-gentle-inla-tutorial/)
+
+```{r}
+MPLNI <- inla(y ~ Decid + f(SiteID, model = "iid"),
+    data = x, family = "poisson"
+)
+
+DPLNI <- drop(exp(X %*% MPLNI$summary.fixed[, "mean"]))
+```
 
 ### Regression trees
 
@@ -357,7 +374,8 @@ xi <- data.frame(
 )
 ```
 
-```{r eval=FALSE}
+```{r}
+#| eval: false
 # this does k-fold cross validation
 brt <- gbm.step(xi,
     gbm.y = 1,
@@ -446,6 +464,7 @@ mean(DZIP)
 mean(DZINB)
 mean(DPG)
 mean(DPLN)
+mean(DPLNI)
 mean(DBRT)
 ```
 

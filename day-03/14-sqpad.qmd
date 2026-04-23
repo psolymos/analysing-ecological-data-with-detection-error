@@ -13,7 +13,8 @@ format:
 
 ```{r}
 library(detect)
-set.seed(0)
+library(bSims)
+set.seed(123)
 ```
 
 # Introduction
@@ -97,6 +98,27 @@ $Y_s |(N_s=n_s,Z_s,t_s,r_s)∼Binomial(n_s,p_s)$, where $p_s$ denotes the probab
 - Farther an individual is from the observer, smaller is the chance that a cue emanated by that individual will be detected by the observer.
 - This corresponds to a thinned point process. The perceived cue rate is reduced.
 
+To illustrate the thinning process, we'll use bSims.
+
+```{r}
+b <- bsims_all(
+    density = 1.5,
+    vocal_rate = 0.5,
+    tau = 2
+)$new()
+
+# events
+v <- get_events(b)
+plot(v)
+curve((1 - exp(-0.5 * x)) * get_abundance(b), col = 2, add = TRUE)
+
+# detections
+q <- get_detections(b)
+plot(q)
+curve((1 - exp(-0.5 * x)) * get_abundance(b), col = 2, add = TRUE)
+```
+
+
 ## Incorporating the distance effect on perception
 
 - Similar to the visibility functions in distance sampling, let $\nu(r,\phi)$ be any function such that $\nu(0,\phi)=1$ and decreases to 0 as the distance increases.
@@ -150,7 +172,7 @@ A full simulation example using bSims can be found at <https://github.com/psolym
 Here we'll do statistical simulations to demonstrate how the functions work.
 
 ```{r}
-n <- 100
+n <- 200
 x <- rnorm(n)
 D <- exp(-2 + 0.5 * x)
 phi <- 0.25
@@ -166,10 +188,15 @@ Y <- rbinom(n, N, p)
 df <- data.frame(x = x, y = Y)
 ```
 
-Estimate effects:
+Estimate effects (note: `phi` estimate here refers to the distance effect, `delta` if for the cue rate):
 
 ```{r}
-m <- sqpad(y ~ x | 1, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
+m <- sqpad(y ~ x | 1,
+    data = df,
+    dis = dis, dur = dur,
+    type = "full", det = "joint",
+    K = NULL
+)
 
 print(m)
 summary(m)
@@ -198,8 +225,14 @@ m0 <- sqpad(y ~ 1 | 1, data = df, dis = dis, dur = dur, type = "full", det = "jo
 m1 <- sqpad(y ~ 1 | x, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
 m2 <- sqpad(y ~ x | x, data = df, dis = dis, dur = dur, type = "full", det = "joint", K = NULL)
 
-AIC(m, m0, m1, m2) # m2 is best
-BIC(m, m0, m1, m2) # this is needed!
+# see how sample size impacts the best model
+# remember that the 'true' model was m
+a <- AIC(m, m0, m1, m2)
+a$dAIC <- a$AIC - min(a$AIC)
+b <- BIC(m, m0, m1, m2)
+b$dBIC <- b$BIC - min(b$BIC)
+a[order(a$AIC), ]
+b[order(b$BIC), ]
 ```
 
 # Field data analysis
@@ -308,4 +341,6 @@ lam <- exp(drop(X %*% coef(mod)[startsWith(names(coef(mod)), "log.D_")]))
 summary(lam)
 
 # compare to naive and QPAD from session 13
+mean(fitted(glm(y ~ FOR, data = data.frame(y = yc[, "10min/50m"], x), family = poisson)))
+mean(fitted(glm(y ~ FOR, data = data.frame(y = yc[, "3min/Infm"], x), family = poisson)))
 ```
