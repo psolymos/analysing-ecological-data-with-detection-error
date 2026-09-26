@@ -5,7 +5,7 @@
 
 ## Versions
 
-- [April, 2026](https://github.com/psolymos/analysing-ecological-data-with-detection-error/releases/tag/AEDD01_2026-04-23)
+- Previous versions: see [Releases](https://github.com/psolymos/analysing-ecological-data-with-detection-error/releases)
 - Latest: see the `main` branch
 
 ## Instructor
