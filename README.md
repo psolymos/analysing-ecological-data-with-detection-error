@@ -3,6 +3,11 @@
 > Learn to analyse ecological field data with detection error using R. 
 > Work with point counts, ARU data, N-mixture models, distance sampling and time-removal methods.
 
+## Versions
+
+- [April, 2026](https://github.com/psolymos/analysing-ecological-data-with-detection-error/releases/tag/AEDD01_2026-04-23)
+- Latest: see the `main` branch
+
 ## Instructor
 
 Dr. Péter Sólymos is an ecologist and R programmer. He has worked with continental scale data sets and
